@@ -1,0 +1,54 @@
+parameters:
+	crm:
+		addr: @environmentConfig::get('CRM_ADDR')
+		api_token: @environmentConfig::get('CRM_API_TOKEN')
+	errbit:
+		send_errors: false
+		api_key: 63420e9df1e3f24dc30a29bffea1d016
+		host: errbit.tomaj.sk
+		port: 443
+		secure: true
+		environment_name: mailer/production
+		project_root: /data/web/remp2020.com/app/Mailer/current
+
+services:
+	- Remp\MailerModule\Models\Users\Dummy
+	hermesMemoryDriver:
+		factory: Remp\MailerModule\Hermes\MemoryDriver
+	hermesDispatcher:
+		factory: Tomaj\Hermes\Dispatcher(@hermesMemoryDriver, @hermesLogger, @hermesShutdown)
+	hermesEmitter:
+		factory: Tomaj\Hermes\Emitter(@hermesMemoryDriver, @hermesLogger)
+	segmentAgreggator:
+		setup:
+			- register(Remp\MailerModule\Models\Segment\Dummy())
+	apiTokenRepository:
+		factory: Tomaj\NetteApi\Misc\StaticTokenRepository(['test': '*'])
+	mailFactory:
+		setup:
+			- addMailer(Tests\Feature\Mails\TestMailer())
+	crmClient:
+		factory: Remp\MailerModule\Models\Crm\Client(%crm.addr%, %crm.api_token%)
+
+	allowedDomainManager:
+		setup:
+			- addDomain('expresso.pt')
+
+	- Remp\MailerModule\Commands\UnsubscribeInactiveUsersCommand
+
+	- Tests\Unit\NullTracker
+	- Tests\Feature\TestSegmentProvider
+
+	config:
+		setup:
+			- allowLocalConfigFallback(true)
+
+local_configs:
+	mail_click_tracker: true
+	one_click_unsubscribe: true
+
+latte:
+    extensions:
+        - Remp\MailerModule\Latte\MailerModuleExtension
+        - Nette\Bridges\FormsLatte\FormsExtension
+        - Nette\Bridges\ApplicationLatte\UIExtension(null)

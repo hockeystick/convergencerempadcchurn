@@ -1,0 +1,86 @@
+{form layoutForm}
+    {input id}
+    <div n:if="$form->getErrors()" n:inner-foreach="$form->getErrors() as $error" class="alert alert-danger m-b-30" role="alert">
+        {$error}<br>
+    </div>
+
+    <div class="row">
+        <div class="col-sm-6">
+            <div class="form-group fg-float m-b-30">
+                <div class="fg-line">
+                    {input name, class => 'form-control fg-input'}
+                    {label name, class => 'fg-label' /}
+                </div>
+            </div>
+
+            <div class="form-group fg-float m-b-30">
+                <div class="fg-line">
+                    {input code, class => 'form-control fg-input'}
+                    {label code, class => 'fg-label' /}
+                </div>
+            </div>
+
+            <ul n:if="$langs" class="tab-nav" role="tablist">
+                <li role="presentation" class="active">
+                    <a href="#tab-{$locale}" role="tab" data-toggle="tab" aria-expanded="true">{$locale}</a>
+                </li>
+                <li role="presentation" n:foreach="$langs as $lang">
+                    <a href="#tab-{$lang}" role="tab" data-lang="{$lang}" data-toggle="tab" aria-expanded="false">{$lang}</a>
+                </li>
+            </ul>
+
+            <div class="tab-content p-10">
+                <div id="tab-{$locale}" role="tabpanel" class="tab-pane animated fadeIn active">
+                    <div class="alert bg palette-Grey-200 m-b-30">
+                        <i class="zmdi zmdi-alert-circle-o"></i>
+                        This content will be sent if <strong>{$locale}</strong> locale is used or another translation is not available.
+                    </div>
+
+                    <div class="form-group fg-float m-b-30">
+                        <div class="fg-line">
+                            {input layout_text, class => 'form-control fg-input auto-size'}
+                            {label layout_text, class => 'fg-label' /}
+                        </div>
+                    </div>
+
+                    <div class="form-group m-b-30">
+                        {label layout_html /}
+                        {input layout_html, class => 'form-control html-editor'}
+                    </div>
+                </div>
+
+                <div n:foreach="$langs as $lang" role="tabpanel" class="tab-pane animated fadeIn" id="tab-{$lang}">
+                    {formContainer $lang}
+                        <div class="form-group fg-float m-b-30 m-t-30">
+                            <div class="fg-line">
+                                {input layout_text, class => 'form-control fg-input auto-size'}
+                                {label layout_text, class => 'fg-label' /}
+                            </div>
+                        </div>
+
+                        <div class="form-group m-b-30">
+                            {label layout_html /}
+                            {input layout_html, class => 'form-control html-editor'}
+                        </div>
+                    {/formContainer}
+                </div>
+            </div>
+
+            <div class="fg-line">
+                {input save, class => 'btn btn-info waves-effect'}
+                {input save_close, class => 'btn btn-info waves-effect'}
+            </div>
+        </div>
+    </div>
+{/form}
+
+<script type="text/javascript">
+    let refreshed = [];
+    $('a[data-toggle="tab"]').one('shown.bs.tab', function (e) {
+        let lang = e.target.getAttribute('data-lang');
+        if (lang && !refreshed.includes(lang)) {
+            $('#tab-' + lang + ' .CodeMirror')[0].CodeMirror.refresh();
+            refreshed.push(lang);
+        }
+    });
+</script>

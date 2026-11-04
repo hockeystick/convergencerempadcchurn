@@ -1,0 +1,20 @@
+{
+    "name": "remp/mailer-newrelic-module",
+    "description": "REMP Newrelic Module",
+    "type": "library",
+    "homepage": "https://remp2030.com",
+    "license": "MIT",
+    "require": {
+        "php": "^8.0",
+        "nette/application": "^3.0",
+        "nette/di": "^3.0",
+        "tracy/tracy": "^2.8"
+    },
+    "minimum-stability": "dev",
+    "autoload": {
+        "psr-4": {
+            "Remp\\NewrelicModule\\": "src/"
+        },
+        "classmap": ["src/"]
+    }
+}

@@ -1,0 +1,17 @@
+{layout '../@layout.latte'}
+
+{block #title}
+    Newsletter lists
+{/block}
+
+{block #content}
+
+<div class="card">
+    <div class="card-header">
+        <h2>Newsletter lists</h2>
+        <div class="actions">
+            <a n:href="List:new" class="btn palette-Cyan bg waves-effect">Add new list</a>
+        </div>
+    </div>
+    {control dataTableDefault}
+</div>

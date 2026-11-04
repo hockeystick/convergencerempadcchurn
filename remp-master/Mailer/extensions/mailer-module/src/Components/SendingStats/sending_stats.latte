@@ -1,0 +1,75 @@
+<div class="pie-grid clearfix text-center">
+    <div class="col-xs-6 p-0">
+        <div class="col-xs-6 col-sm-3 pg-item green">
+            <div class="easy-pie" data-percent="100">
+                <span class="ep-value c-black">100</span>
+            </div>
+            <div class="pgi-title c-black">Sent<br> {$total_stat}</div>
+        </div>
+        <div class="col-xs-6 col-sm-3 pg-item green">
+            <div class="easy-pie" data-percent="{$delivered_stat['per']|number:0}">
+                <span class="ep-value c-black">{$delivered_stat['per']|number:2}</span>
+            </div>
+            <div class="pgi-title c-black">Delivered<br> {$delivered_stat['value']}</div>
+        </div>
+        <div class="col-xs-6 col-sm-3 pg-item green">
+            <div class="easy-pie" data-percent="{$opened_stat['per']|number:0}">
+                <span class="ep-value c-black">{$opened_stat['per']|number:2}</span>
+            </div>
+            <div class="pgi-title c-black">Opened<br> {$opened_stat['value']}</div>
+        </div>
+        <div class="col-xs-6 col-sm-3 pg-item green">
+            <div class="easy-pie" data-percent="{$clicked_stat['per']|number:0}">
+                <span class="ep-value c-black">{$clicked_stat['per']|number:2}</span>
+            </div>
+            <div class="pgi-title c-black">
+                <span style="text-decoration: underline dashed; cursor: help" data-toggle="tooltip" title="Number of recipients who clicked on any link in the email (possibly including unsubscribe link) if the click tracking was enabled.">
+                    Clicked
+                </span>
+                <br>
+                {$clicked_stat['value']}</div>
+        </div>
+    </div>
+
+    <div class="col-xs-6 p-0">
+        <div class="col-xs-6 col-sm-3 pg-item green">
+            <div class="easy-pie" data-percent="{$converted_stat['per']|number:0}">
+                <span class="ep-value c-black">{$converted_stat['per']|number:2}</span>
+            </div>
+            <div class="pgi-title c-black">Converted<br>{$converted_stat['value']}</div>
+        </div>
+        <div class="col-xs-6 col-sm-3 pg-item red">
+            <div class="easy-pie" data-percent="{$unsubscribed_stat['per']|number:0}">
+                <span class="ep-value c-black">{$unsubscribed_stat['per']|number:2}</span>
+            </div>
+            <div class="pgi-title c-black">Unsubscribed<br>{$unsubscribed_stat['value']}</div>
+        </div>
+        <div class="col-xs-6 col-sm-3 pg-item red">
+            <div class="easy-pie" data-percent="{$dropped_stat['per']|number:0}">
+                <span class="ep-value c-black">{$dropped_stat['per']|number:2}</span>
+            </div>
+            <div class="pgi-title c-black">Dropped<br>{$dropped_stat['value']}</div>
+        </div>
+        <div class="col-xs-6 col-sm-3 pg-item red">
+            <div class="easy-pie" data-percent="{$spam_stat['per']|number:0}">
+                <span class="ep-value c-black">{$spam_stat['per']|number:2}</span>
+            </div>
+            <div class="pgi-title c-black">Spam<br>{$spam_stat['value']}</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(function() {
+        $('.easy-pie').easyPieChart({
+            easing: 'easeOutBounce',
+            barColor: '#000',
+            trackColor: 'rgba(0, 0, 0, 0.2)',
+            scaleColor: false,
+            lineCap: 'square',
+            lineWidth: 2,
+            size: 75,
+            animate: 3000,
+        });
+    });
+</script>

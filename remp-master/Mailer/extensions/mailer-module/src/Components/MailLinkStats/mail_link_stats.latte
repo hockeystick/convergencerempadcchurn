@@ -1,0 +1,29 @@
+<style>
+    .table-image-tooltip + .tooltip img {
+        max-width: 300px;
+    }
+
+    .tooltip-inner {
+        padding: 0;
+    }
+
+    .table-url a {
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
+</style>
+
+{control dataTableMailLinkStats}
+
+<script>
+    $('table').on( 'draw.dt', function () {
+        $('.table-image-tooltip').tooltip({
+            html: true,
+            placement: 'top'
+        });
+    })
+</script>

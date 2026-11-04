@@ -1,0 +1,19 @@
+{form templateTestForm}
+    <div n:if="$form->getErrors()" n:inner-foreach="$form->getErrors() as $error" class="alert alert-danger" role="alert">
+        {$error}<br>
+    </div>
+
+
+    <div class="row form-group">
+        <div n:ifset="$form['locale']" class="col-sm-4">
+            {input locale, class => 'form-control selectpicker'}
+        </div>
+
+        <div class="col-sm-8">
+            {input email, class => 'form-control fg-input', 'placeholder' => 'Email'}
+            {label email, class => 'sr-only' /}
+        </div>
+    </div>
+
+    {input save, class => 'btn btn-info waves-effect'}
+{/form}

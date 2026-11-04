@@ -1,0 +1,13 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - vendor/nesbot/carbon/extension.neon
+
+parameters:
+    paths:
+        - app/
+#        - extensions/beam-module/src
+    level: 3
+    databaseMigrationsPath:
+        - database/migrations/
+        - extensions/beam-module/database/migrations
+    excludePaths:

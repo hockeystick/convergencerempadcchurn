@@ -1,0 +1,324 @@
+stages:
+  - test
+  - deploy
+
+cache:
+  paths:
+    - bin/
+
+syntax:8.2:
+  stage: test
+  image: php:8.2-cli
+  tags:
+    - docker
+  script:
+    - make syntax
+
+syntax:8.3:
+  stage: test
+  image: php:8.3-cli
+  tags:
+    - docker
+  script:
+    - make syntax
+
+sniffer:
+  stage: test
+  image: remp/php-ci:8.3.20
+  tags:
+    - docker
+  script:
+    - make composer-audit
+    - make composer-install
+    - make sniff
+
+phpstan:
+  stage: test
+  image: remp/php-ci:8.3.20
+  tags:
+    - docker
+  script:
+    - make composer-install
+    - make phpstan
+
+latte_lint:
+  stage: test
+  image: remp/php-ci:8.3.20
+  tags:
+    - docker
+  script:
+    - make composer-install
+    - make latte-lint
+
+tests:
+  stage: test
+  image: remp/php-ci:8.3.20
+  tags:
+    - docker
+  script:
+    - make composer-install
+    - make copy-env
+    - make phpunit
+  services:
+    - name: mysql:8.0.29
+      alias: mysql
+      command: ["--require_secure_transport=OFF", "--default-authentication-plugin=mysql_native_password"]
+    - name: redis:6.2
+      alias: redis
+  variables:
+    MYSQL_DATABASE: remp_test
+    MYSQL_ROOT_PASSWORD: secret
+    REDIS_PORT: 6379
+
+# DENNIKN.SK
+
+"mailer/🇸🇰":
+  stage: deploy
+  script:
+    - >
+      curl -X POST
+      -F "token=$CI_JOB_TOKEN"
+      -F "ref=master"
+      -F "variables[REF]=$CI_COMMIT_SHA"
+      -F "variables[STAGE]=dennikn/mailer"
+      -F "variables[URL]=https://mailer.remp2020.com"
+      -F "variables[APP]=mailer"
+      $DEPLOY_TRIGGER_PIPELINE_URL
+  when: manual
+  tags:
+    - remp2020
+    - deploy
+    - php8
+  only:
+    - master
+
+"campaign/🇸🇰":
+  stage: deploy
+  script:
+    - >
+      curl -X POST
+      -F "token=$CI_JOB_TOKEN"
+      -F "ref=master"
+      -F "variables[REF]=$CI_COMMIT_SHA"
+      -F "variables[STAGE]=dennikn/campaign"
+      -F "variables[URL]=https://campaign.remp2020.com"
+      -F "variables[APP]=campaign"
+      $DEPLOY_TRIGGER_PIPELINE_URL
+  when: manual
+  tags:
+    - remp2020
+    - deploy
+    - php8
+  only:
+    - master
+  dependencies: []
+
+"beam/🇸🇰":
+  stage: deploy
+  script:
+    - >
+      curl -X POST
+      -F "token=$CI_JOB_TOKEN"
+      -F "ref=master"
+      -F "variables[REF]=$CI_COMMIT_SHA"
+      -F "variables[STAGE]=dennikn/beam"
+      -F "variables[URL]=https://beam.remp2020.com"
+      -F "variables[APP]=beam"
+      $DEPLOY_TRIGGER_PIPELINE_URL
+  when: manual
+  tags:
+    - remp2020
+    - php8
+    - deploy
+  only:
+    - master
+  dependencies: []
+
+"sso/🇸🇰":
+  stage: deploy
+  script:
+    - >
+      curl -X POST
+      -F "token=$CI_JOB_TOKEN"
+      -F "ref=master"
+      -F "variables[REF]=$CI_COMMIT_SHA"
+      -F "variables[STAGE]=dennikn/sso"
+      -F "variables[URL]=https://sso.remp2020.com"
+      -F "variables[APP]=sso"
+      $DEPLOY_TRIGGER_PIPELINE_URL
+  when: manual
+  tags:
+    - remp2020
+    - deploy
+    - php8
+  only:
+    - master
+  dependencies: []
+
+# DENIKN.CZ
+
+"mailer/🇨🇿":
+  stage: deploy
+  script:
+    - >
+      curl -X POST
+      -F "token=$CI_JOB_TOKEN"
+      -F "ref=master"
+      -F "variables[REF]=$CI_COMMIT_SHA"
+      -F "variables[STAGE]=denikncz/mailer"
+      -F "variables[URL]=https://mailer.denikn.cz"
+      -F "variables[APP]=mailer"
+      $DEPLOY_TRIGGER_PIPELINE_URL
+  when: manual
+  tags:
+    - remp2020
+    - deploy
+    - php8
+  only:
+    - master
+  dependencies: []
+
+"campaign/🇨🇿":
+  stage: deploy
+  script:
+    - >
+      curl -X POST
+      -F "token=$CI_JOB_TOKEN"
+      -F "ref=master"
+      -F "variables[REF]=$CI_COMMIT_SHA"
+      -F "variables[STAGE]=denikncz/campaign"
+      -F "variables[URL]=https://campaign.denikn.cz"
+      -F "variables[APP]=campaign"
+      $DEPLOY_TRIGGER_PIPELINE_URL
+  when: manual
+  tags:
+    - remp2020
+    - deploy
+    - php8
+  only:
+    - master
+  dependencies: []
+
+"beam/🇨🇿":
+  stage: deploy
+  script:
+    - >
+      curl -X POST
+      -F "token=$CI_JOB_TOKEN"
+      -F "ref=master"
+      -F "variables[REF]=$CI_COMMIT_SHA"
+      -F "variables[STAGE]=denikncz/beam"
+      -F "variables[URL]=https://beam.denikn.cz"
+      -F "variables[APP]=beam"
+      $DEPLOY_TRIGGER_PIPELINE_URL
+  when: manual
+  tags:
+    - remp2020
+    - deploy
+    - php8
+  only:
+    - master
+  dependencies: []
+
+"sso/🇨🇿":
+  stage: deploy
+  script:
+    - >
+      curl -X POST
+      -F "token=$CI_JOB_TOKEN"
+      -F "ref=master"
+      -F "variables[REF]=$CI_COMMIT_SHA"
+      -F "variables[STAGE]=denikncz/sso"
+      -F "variables[URL]=https://sso.denikn.cz"
+      -F "variables[APP]=sso"
+      $DEPLOY_TRIGGER_PIPELINE_URL
+  when: manual
+  tags:
+    - remp2020
+    - deploy
+    - php8
+  only:
+    - master
+  dependencies: []
+
+# PREVIEW
+
+"mailer/🗞️":
+  stage: deploy
+  script:
+    - >
+      curl -X POST
+      -F "token=$CI_JOB_TOKEN"
+      -F "ref=master"
+      -F "variables[REF]=$CI_COMMIT_SHA"
+      -F "variables[STAGE]=respektcz/mailer"
+      -F "variables[APP]=mailer"
+      $DEPLOY_TRIGGER_PIPELINE_URL
+  when: manual
+  tags:
+    - remp2020
+    - deploy
+    - php8
+  only:
+    - master
+  dependencies: []
+
+"campaign/🗞️":
+  stage: deploy
+  script:
+    - >
+      curl -X POST
+      -F "token=$CI_JOB_TOKEN"
+      -F "ref=master"
+      -F "variables[REF]=$CI_COMMIT_SHA"
+      -F "variables[STAGE]=respektcz/campaign"
+      -F "variables[APP]=campaign"
+      $DEPLOY_TRIGGER_PIPELINE_URL
+  when: manual
+  tags:
+    - remp2020
+    - deploy
+    - php8
+  only:
+    - master
+  dependencies: []
+
+"beam/🗞️":
+  stage: deploy
+  script:
+    - >
+      curl -X POST
+      -F "token=$CI_JOB_TOKEN"
+      -F "ref=master"
+      -F "variables[REF]=$CI_COMMIT_SHA"
+      -F "variables[STAGE]=respektcz/beam"
+      -F "variables[APP]=beam"
+      $DEPLOY_TRIGGER_PIPELINE_URL
+  when: manual
+  tags:
+    - remp2020
+    - deploy
+    - php8
+  only:
+    - master
+  dependencies: []
+
+"sso/🗞️":
+  stage: deploy
+  script:
+    - >
+      curl -X POST
+      -F "token=$CI_JOB_TOKEN"
+      -F "ref=master"
+      -F "variables[REF]=$CI_COMMIT_SHA"
+      -F "variables[STAGE]=respektcz/sso"
+      -F "variables[APP]=sso"
+      $DEPLOY_TRIGGER_PIPELINE_URL
+  when: manual
+  tags:
+    - remp2020
+    - deploy
+    - php8
+  only:
+    - master
+  dependencies: []

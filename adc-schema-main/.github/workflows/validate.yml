@@ -1,0 +1,39 @@
+name: Validate
+
+# The release gate, run on every pull request and on every push to main.
+# A schema with validation errors cannot be merged, and therefore cannot be tagged.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: validate (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # Errors fail the job. The known model-review warnings of 1.0.0 (see
+      # "Known issues" in README.md) are printed but do not fail it.
+      - name: Validate schema and taxonomies
+        run: npm run validate
+
+      - name: Self-test the validator
+        run: npm test
+
+      - name: Check that the package would publish
+        run: npm pack --dry-run

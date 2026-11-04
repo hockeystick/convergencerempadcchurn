@@ -1,0 +1,17 @@
+$primaryColor: #00acc1;
+$primaryColorDark: #007c91;
+$primaryColorLight: #5ddef4;
+$highlightColor: #4caf50;
+
+$typeahead-font-size: 1.5rem;
+$typeahead-line-height: 1.5em;
+
+@import "~jquery-typeahead/src/jquery.typeahead";
+@import "~eonasdan-bootstrap-datetimepicker/build/css/bootstrap-datetimepicker.css";
+
+@import "~@remp/js-commons/sass/template.scss";
+@import "~@remp/js-commons/sass/remp.scss";
+@import "~@remp/js-commons/sass/accordion.scss";
+@import "~@remp/js-commons/sass/site-search.scss";
+
+@import "./beam.scss";

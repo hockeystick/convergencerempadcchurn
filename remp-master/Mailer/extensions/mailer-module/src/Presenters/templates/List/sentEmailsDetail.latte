@@ -1,0 +1,332 @@
+{layout '../@layout.latte'} {block #content}
+
+<div class="c-header">
+    <h2>Stats: {$mailTypeTitle}</h2>
+</div>
+
+
+<div class="well">
+    <div id="smart-range-selector" class="row">
+        <div class="col-md-4">
+            <h4>Filter by date</h4>
+            <input type="hidden" name="from" value="{$from}">
+            <input type="hidden" name="to" value="{$to}">
+            <smart-range-selector from="{$from}" to="{$to}" :callback="callback">
+            </smart-range-selector>
+        </div>
+
+        <div class="col-md-2">
+            <h4>Group by:</h4>
+            <div role="group" class="btn-group btn-group-sm pull-left">
+                <button type="button" data-value="day" class="btn group-by-trigger {if $groupBy === 'day'}btn-info{else}btn-default{/if}">Day</button>
+                <button type="button" data-value="week" class="btn group-by-trigger {if $groupBy === 'week'}btn-info{else}btn-default{/if}">Week</button>
+                <button type="button" data-value="month" class="btn group-by-trigger {if $groupBy === 'month'}btn-info{else}btn-default{/if}">Month</button>
+            </div>
+        </div>
+
+        <div class="col-md-2">
+            <h4>Export:</h4>
+            <button id="export-data" type="button" class="btn btn-info">CSV</button>
+        </div>
+
+        <div class="col-md-4 text-right">
+            <a n:href="show $mailTypeId" class="btn btn-sm palette-Cyan bg waves-effect">
+                <i class="zmdi zmdi-eye"></i> Show
+            </a>
+            <a n:href="edit $mailTypeId" class="btn btn-sm palette-Cyan bg waves-effect">
+                <i class="zmdi zmdi-edit"></i> Edit
+            </a>
+            <a n:href="Dashboard:default" class="btn btn-sm palette-Cyan bg waves-effect">Back to dashboard</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    function weekParser(value) {
+        return moment(value, 'YYYY-WW').isoWeekday(4);
+    }
+</script>
+
+<div class="card">
+    <div class="card-header">
+        <h2 n:block="title">
+            <strong>Delivery and interactions</strong><br>
+        </h2>
+    </div>
+
+    {snippet graph}
+        <div class="p-30">
+            <canvas id="mailer-dashboard-detail-statistics-graph" width="1500" height="500"></canvas>
+        </div>
+
+        <script>
+            var ctx = document.getElementById("mailer-dashboard-detail-statistics-graph").getContext('2d');
+            new Chart(ctx, {
+                type: "line",
+                data: {
+                    "labels": {$labels},
+                    "datasets": [{$sentDataSet}, {$openedDataSet}, {$clickedDataSet}, {$unsubscibedDataSet}]
+                },
+                plugins: [{
+                    afterDraw: chart => {
+                        if (chart.tooltip?._active?.length) {
+                            let x = chart.tooltip._active[0].element.x;
+                            let yAxis = chart.scales.y;
+                            let ctx = chart.ctx;
+                            ctx.save();
+                            ctx.beginPath();
+                            ctx.moveTo(x, yAxis.top);
+                            ctx.lineTo(x, yAxis.bottom);
+                            ctx.lineWidth = 1;
+                            ctx.strokeStyle = 'rgba(0, 0, 255, 0.4)';
+                            ctx.stroke();
+                            ctx.restore();
+                        }
+                    }
+                }],
+                options: {
+                    interaction: {
+                        mode: 'index'
+                    },
+                    borderWidth: 1,
+                    elements: {
+                        point: {
+                            radius: 0,
+                            hitRadius: 50,
+                        }
+                    },
+                    tension: 0,
+                    lineTension: 0,
+                    plugins: {
+                        legend: {
+                            display: true,
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: "timeseries",
+                            time: {
+                                displayFormats: {
+                                    "day": "ll",
+                                    "week": "W/YYYY",
+                                    "month": "MMMM YY",
+                                },
+                                tooltipFormat: {$tooltipFormat},
+                                unit: {$groupBy},
+                                parser: {if $groupBy === 'week'} weekParser {else} {$parser} {/if},
+                            },
+                            grid: {
+                                display: false,
+                            }
+                        },
+                    },
+                    tooltips: {
+                        bodyFontSize: 14
+                    }
+                }
+            });
+        </script>
+    {/snippet}
+</div>
+<div class="card">
+    {snippet relativeGraph}
+        <div class="card-header">
+            <h2>
+                <strong>Interaction rates</strong><br>
+            </h2>
+        </div>
+
+        <div class="p-30">
+            <canvas id="mailer-dashboard-detail-statistics-graph-relative" width="1500" height="500"></canvas>
+        </div>
+
+        <script>
+            var ctx = document.getElementById("mailer-dashboard-detail-statistics-graph-relative").getContext('2d');
+            new Chart(ctx, {
+                type: "line",
+                data: {
+                    "labels": {$labels},
+                    "datasets": [{$openRateDataSet}, {$clickRateDataSet}]
+                },
+                plugins: [{
+                    afterDraw: chart => {
+                        if (chart.tooltip?._active?.length) {
+                            let x = chart.tooltip._active[0].element.x;
+                            let yAxis = chart.scales.y;
+                            let ctx = chart.ctx;
+                            ctx.save();
+                            ctx.beginPath();
+                            ctx.moveTo(x, yAxis.top);
+                            ctx.lineTo(x, yAxis.bottom);
+                            ctx.lineWidth = 1;
+                            ctx.strokeStyle = 'rgba(0, 0, 255, 0.4)';
+                            ctx.stroke();
+                            ctx.restore();
+                        }
+                    }
+                }],
+                options: {
+                    interaction: {
+                        mode: 'index'
+                    },
+                    borderWidth: 1,
+                    elements: {
+                        point: {
+                            radius: 0,
+                            hitRadius: 50,
+                        }
+                    },
+                    tension: 0,
+                    lineTension: 0,
+                    plugins: {
+                        legend: {
+                            display: true,
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: "timeseries",
+                            time: {
+                                displayFormats: {
+                                    "day": "ll",
+                                    "week": "w/YYYY",
+                                    "month": "MMMM YY",
+                                },
+                                tooltipFormat: {$tooltipFormat},
+                                unit: {$groupBy},
+                                parser: {if $groupBy === 'week'} weekParser {else} {$parser} {/if},
+                            },
+                            grid: {
+                                display: false,
+                            }
+                        },
+                    },
+                    tooltips: {
+                        bodyFontSize: 14
+                    }
+                }
+            });
+        </script>
+    {/snippet}
+</div>
+
+<script>
+    (function () {
+        var $from = $('[name="from"]'),
+            $to   = $('[name="to"]');
+
+        function getDataAndRenderGraphs(from, to, groupBy) {
+            $.ajax({
+                url: {link filterChanged!},
+                type: 'POST',
+                data: {
+                    id: {$mailTypeId},
+                    from: from,
+                    to: to,
+                    group_by: groupBy,
+                    tz: Intl.DateTimeFormat().resolvedOptions().timeZone
+                },
+                success: function (data) {
+                    var params = $.param({
+                        published_from: from,
+                        published_to: to,
+                        group_by: groupBy,
+                        tz: Intl.DateTimeFormat().resolvedOptions().timeZone
+                    });
+
+                    var url = window.location.href;
+                    var urlSplit = url.split( "?" );
+                    var stateObj = { Url: urlSplit[0] + "?" + params};
+                    history.pushState(stateObj, null, stateObj.Url);
+
+                    $('#snippet--graph').html(data["snippets"]["snippet--graph"]);
+                    $('#snippet--relativeGraph').html(data["snippets"]["snippet--relativeGraph"]);
+                    $('#snippet--exportData').html(data["snippets"]["snippet--exportData"]);
+                },
+                error: function () {
+                    console.log('response error');
+                }
+            });
+        }
+
+        // bind smart range selector
+        new Vue({
+            el: "#smart-range-selector",
+            components: {
+                'smart-range-selector': SmartRangeSelector
+            },
+            methods: {
+                callback: function (from, to) {
+                    getDataAndRenderGraphs(from, to, $('.group-by-trigger.btn-info').data('value'));
+
+                    $from.val(from);
+                    $to.val(to).trigger("change");
+                }
+            }
+        });
+
+        // bind group by
+        $('.group-by-trigger').on('click', function () {
+            $('.group-by-trigger').removeClass('btn-info').addClass('btn-default');
+            $(this).removeClass('btn-default').addClass('btn-info');
+
+            getDataAndRenderGraphs($from.val(), $to.val(), $('.group-by-trigger.btn-info').data('value'));
+        });
+
+        // get init data
+        getDataAndRenderGraphs({$from}, {$to}, {$groupBy});
+    })();
+</script>
+
+{snippet exportData}
+    <script>
+        var labels = {$labels},
+            sentDataSet = {$sentDataSet},
+            openedDataSet = {$openedDataSet},
+            clickedDataSet = {$clickedDataSet},
+            unsubscribedDataSet = {$unsubscibedDataSet},
+            openRateDataSet = {$openRateDataSet},
+            clickRateDataSet = {$clickRateDataSet};
+    </script>
+{/snippet}
+
+<script>
+    $(function () {
+        var header = [null, 'Sent', 'Opened', 'Clicked', 'Unsubscribed', 'Open Rate', 'Click Rate'],
+            columnDelimiter = ',',
+            lineDelimiter = '\n',
+            fileName = 'export-data.csv';
+
+        $("#export-data").on('click', function () {
+            var data = [header];
+            for (var i = 0; i < labels.length; i++) {
+                data.push([
+                    labels[i],
+                    sentDataSet.data[i],
+                    openedDataSet.data[i],
+                    clickedDataSet.data[i],
+                    unsubscribedDataSet.data[i],
+                    openRateDataSet.data[i],
+                    clickRateDataSet.data[i],
+                ])
+            }
+
+            var result = '';
+            data.forEach(function (row) {
+                row.forEach(function (column) {
+                    result += column + columnDelimiter;
+                })
+                result = result.slice(0, -1) + lineDelimiter;
+            });
+
+            var csv = 'data:text/csv;charset=utf-8,' + result;
+            var uri = encodeURI(csv);
+            link = document.createElement('a');
+            link.setAttribute('href', uri);
+            link.setAttribute('download', fileName);
+            document.body.appendChild(link); // Required for FF
+            link.click();
+            document.body.removeChild(link);
+        });
+    });
+</script>

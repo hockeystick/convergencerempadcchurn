@@ -1,0 +1,44 @@
+{if $last}
+	{snippet mailFormWrapper}
+        <div class="row">
+		    {control mailGeneratorForm}
+        </div>
+		{include onChangeCallback, input => source_template_id, link => sourceTemplateChange}
+	{/snippet}
+{else}
+    <div class="well text-center text-muted">
+        <p>You have to create source template for generator.</p>
+    </div>
+{/if}
+<script>
+    $.nette.ext('loadGenerator', {
+        success: function () {
+            $('.wysiwyg-editor').trumbowyg({
+                tagsToKeep: ['i', 'b', 'ul', 'li', 'ol', 'a', 'em', 'img', 'hr'],
+                autogrow: true
+            });
+        }
+    });
+</script>
+
+{define onChangeCallback}
+    <script>
+        $('#' + {$control["mailGeneratorForm"][$input]->htmlId}).off('change').on('change', function () {
+            $('#' + {$control["mailGeneratorForm"]->getElementPrototype()->id}).find('input, select, textarea').each(function() {
+                if ($(this).attr('id') === {$control["mailGeneratorForm"][$input]->htmlId}) {
+                    return;
+                }
+                $(this).closest('.form-group').hide();
+            });
+            $('#spinner').show();
+            $.nette.ajax({
+                type: 'GET',
+                url: {link {$link}!},
+                data: {
+                    'source_template_id': $(this).val()
+                }
+            });
+        });
+        $('.selectpicker').selectpicker('render');
+    </script>
+{/define}

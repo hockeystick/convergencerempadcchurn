@@ -1,0 +1,12 @@
+services:
+	moduleManager:
+		setup:
+			- addModule(Crm\ChurnPredictionModule\ChurnPredictionModule())
+
+	- Crm\ChurnPredictionModule\Models\BigQueryConfig(%churnPrediction.bigquery.service_account_path%, %churnPrediction.bigquery.project%, %churnPrediction.bigquery.dataset%)
+	- Crm\ChurnPredictionModule\Models\ChurnExport\TierMaxPriceSnapshotBuilder
+	- Crm\ChurnPredictionModule\Models\ChurnExport\ChurnFeatureCalculator
+	- Crm\ChurnPredictionModule\Models\BigQuery\StagingMergeSqlBuilder
+	runChurnPipelineCommand: Crm\ChurnPredictionModule\Commands\RunChurnPipelineCommand
+	- Crm\ChurnPredictionModule\Commands\DownloadChurnPredictionsCommand
+	- Crm\ChurnPredictionModule\Repositories\ChurnPredictionsRepository

@@ -1,0 +1,157 @@
+php:
+	intl.default_locale: sk_SK
+
+extensions:
+#	newrelic: Remp\NewrelicModule\DI\NewrelicModuleExtension
+
+#parameters:
+#	crm:
+#		addr: @environmentConfig::get('CRM_API_ADDR')
+#		api_token: @environmentConfig::get('CRM_API_TOKEN')
+#	respekt:
+#		content_url: @environmentConfig::get('RESPEKT_CONTENT_URL')
+#		content_token: @environmentConfig::get('RESPEKT_CONTENT_TOKEN')
+
+services:
+    # All console commands you need to use should be registered here
+    # This is a set that we recommend to use
+    console:
+        setup:
+            - add(Remp\MailerModule\Commands\SyncUserSubscriptionsCommand())
+            # - add(Remp\MailerModule\Commands\SyncDeletedUsersCommand())
+            - add(Remp\MailerModule\Commands\MailgunEventsCommand())
+            # If you're using Beam, you can enable this command to pull conversions from there
+            # - add(Remp\MailerModule\Commands\ProcessConversionStatsCommand())
+
+            # Enable only if "crmClient" service is available
+            - add(Remp\MailerModule\Commands\ValidateCrmEmailsCommand())
+
+#	# Internal CRM system. For more details contact Tomas Bella.
+#	authenticator:
+#		factory: Remp\MailerModule\Models\Auth\Authenticator
+#	authStorage:
+#		factory: Remp\MailerModule\Models\Auth\RemoteUser(%sso_host%)
+
+    embedParser:
+        setup:
+            - setVideoLinkText("Click to play video")
+            - setTwitterLinkText("Click to display on X (Twitter)")
+    articleLocker:
+        setup:
+            - setLockText("Exclusive content")
+            - setupLockLink("Registration", "https://www.demosite.com/registration")
+
+    unsubscribeDroppedHandler:
+        factory: Remp\MailerModule\Hermes\UnsubscribeDroppedHandler
+        setup:
+            - setThreshold(3) # number of dropped emails before unsubscribing user
+
+    # shutdown hermes and mail worker with file (checks modification date; see SharedFileShutdown implementation)
+    hermesShutdown: Tomaj\Hermes\Shutdown\SharedFileShutdown('/tmp/hermes_shutdown')
+    hermesWorker:
+        setup:
+            - add('email-dropped', @unsubscribeDroppedHandler)
+
+            # Tracking of sent emails into REMP Beam.
+            # Requires enabled Tracker\Remp (search this config).
+            #- add('mail-sent', Remp\MailerModule\Hermes\MailSentHandler())
+
+            # Notifications to CRM that users' newsletter subscription was updated.
+            # Note: Requires crmClient (search this config).
+            #- add('user-subscribed', Remp\MailerModule\Hermes\NotifyCrmSubscribeUnsubscribeHandler())
+            #- add('user-unsubscribed', Remp\MailerModule\Hermes\NotifyCrmSubscribeUnsubscribeHandler())
+            #- add('user-subscribed-variant', Remp\MailerModule\Hermes\NotifyCrmSubscribeUnsubscribeHandler())
+            #- add('user-unsubscribed-variant', Remp\MailerModule\Hermes\NotifyCrmSubscribeUnsubscribeHandler())
+
+    #crmClient:
+    #    factory: Remp\MailerModule\Models\Crm\Client(%crm.addr%, %crm.api_token%)
+
+
+    # Setup loggers output
+    commandsLogger:
+        setup:
+            - pushHandler(Monolog\Handler\StreamHandler("%appDir%/../log/commands.log"))
+    mailProcessLogger:
+        setup:
+            - pushHandler(Monolog\Handler\StreamHandler("%appDir%/../log/mail_process_job.log"))
+    hermesLogger:
+        setup:
+            - pushHandler(Monolog\Handler\StreamHandler("%appDir%/../log/hermes.log"))
+            - pushHandler(Monolog\Handler\ErrorLogHandler())
+
+    # This is a reference Remp\MailerModule\Models\Users\IUser implementation.
+    # You should make your own implementation against your CRM system and register it here.
+    # Or use our CRM implementation:
+    # - Remp\MailerModule\Models\Users\Crm(%crm.addr%, %crm.api_token%)
+    - Remp\MailerModule\Models\Users\Dummy
+
+    # To be able to send an email, you need to provide at least one ISegment implementation
+    # You should make your own implementation against your CRM system and register it here.
+    segmentAgreggator:
+        setup:
+            - register(Remp\MailerModule\Models\Segment\Dummy())
+#            - register(Remp\MailerModule\Models\Segment\Crm(%crm.addr%, %crm.api_token%))
+#            - register(Remp\MailerModule\Models\Segment\Beam(%remp.beam.segments_addr%))
+#            - register(Remp\MailerModule\Models\Segment\Pythia(%remp.pythia.segments_addr%))
+
+    # If you are using REMP Beam, enable Tracker (parameters are loaded from .env)
+#    - Remp\MailerModule\Models\Tracker\Remp(%remp.beam.tracker_addr%, %remp.beam.tracker_property_token%)
+    # otherwise keep NullTracker enabled
+    # (ITracker implementation is required by UnsubscribeInactiveUsersCommand initialized by MailerModule)
+    - Tests\Unit\NullTracker
+
+#    eventDispatcher:
+#        factory: League\Event\EventDispatcher
+#        setup:
+#            - subscribeTo(Remp\MailerModule\Events\MailSentEvent, Remp\MailerModule\Events\MailSentEventHandler())
+
+    # If you're using Beam and want to use ProcessConversionStatsCommand, enable this repository (it's a dependency)
+#    - Remp\MailerModule\Repositories\BeamConversionsRepository
+
+    # Setup of multiple mailers of the same type
+#	mailFactory:
+#		setup:
+#			- addMailer(Remp\MailerModule\Models\Mailer\MailgunMailer(code: us))
+#			- addMailer(Remp\MailerModule\Models\Mailer\MailgunMailer(code: eu))
+
+    # Setup of secondary locales
+    localizationConfig:
+        setup:
+            - addSecondaryLocales(['hu'])
+
+#	allowedDomainManager:
+#		setup:
+#			- addDomain('dennikn.sk')
+
+# configuration required by Respekt's URL parser generators
+# (this is whole configuration; merge it with your existing configuration (other generators)
+#	generator:
+#		factory: Remp\MailerModule\Models\Generators\GeneratorFactory
+#		setup:
+#			- registerGenerator('respekt_url_parser', 'Respekt URL parser', \Remp\Mailer\Models\Generators\RespektUrlParserGenerator(\Remp\Mailer\Models\PageMeta\Content\RespektContent()))
+#			- registerGenerator('respekt_article', 'Respekt article', \Remp\Mailer\Models\Generators\RespektArticleGenerator(\Remp\Mailer\Models\PageMeta\Content\RespektContent()))
+#
+#	respektUrlParserTemplateFormFactory:
+#		setup:
+#			- setLayoutCode('layout-code')
+#			- setDefaultMailTypeCode('mail-type-code')
+#	transporter:
+#		factory: Remp\Mailer\Models\PageMeta\Transport\RespektApiTransport(%respekt.content_url%, %respekt.content_token%)
+# (END) configuration required by Respekt's URL parser generators
+
+# local_configs override DBs configs records.
+local_configs:
+
+    # Configuring usage of mailhog for local development
+    remp_smtp_host: mailhog
+    remp_smtp_host_port: 1025
+    remp_smtp_host_username: ''
+    remp_smtp_host_password: ''
+    remp_smtp_host_secure: ''
+
+
+# If running Mailer on Valet, please uncomment the following lines and adjust the full path to REMP/Mailer folder
+
+#webpack:
+#    build:
+#        directory: /FULL_PATH_TO_REMP_FOLDER/Mailer/www/assets/vendor

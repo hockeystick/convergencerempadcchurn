@@ -1,0 +1,194 @@
+{layout '../@layout.latte'}
+
+{block #content}
+
+<div class="c-header">
+    <h2>Jobs</h2>
+</div>
+<div class="card">
+    <div class="card-header">
+        <h2 n:block="title">Job <span class="text-muted">#{$job->id}</span><small></small></h2>
+        <div class="actions">
+            <a n:if="$jobIsEditable" n:href="Job:EditJob $job->id" class="btn palette-Cyan bg waves-effect">
+                <i class="zmdi zmdi-edit"></i> Edit job
+            </a>
+            <a href="#new-batch-form" data-toggle="collapse">
+                <button type="button" class="btn palette-Cyan bg waves-effect"><i class="zmdi zmdi-plus-circle"></i> Add batch</button>
+            </a>
+        </div>
+    </div>
+    <div class="card-body card-padding">
+    </div>
+</div>
+
+<div class="card collapse" id="new-batch-form">
+    <div class="card-header">
+        <h2>Add Batch</h2>
+        <ul class="actions">
+            <li>
+                <a href="#new-batch-form" data-toggle="collapse"><i class="zmdi zmdi-close"></i></a>
+            </li>
+        </ul>
+    </div>
+    <div class="card-body card-padding">
+        {snippetArea wrapper}
+        {include '@form.latte'}
+        {/snippetArea}
+    </div>
+</div>
+
+<div class="well">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="zmdi zmdi-settings"></i> Settings</h2>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        <li class="list-group-item">
+                            <span style="display: block; margin-bottom: 10px">
+                                <strong>Include segments:</strong>
+                                <i class="zmdi zmdi-help" style="cursor: help" data-toggle="tooltip" data-placement="top" title="Send email to users who are in one of the include segments and none of the exclude segments."></i>
+                                {foreach $includeSegments as $segment} <br> {$segment} {/foreach}
+                            </span>
+                            <span style="display: block">
+                                <strong>Exclude segments:</strong>
+                                {foreach $excludeSegments as $segment} <br> {$segment} {/foreach}
+                            </span>
+                        </li>
+                        <li class="list-group-item"><strong>Context:</strong> {$job->context}</li>
+                        <li class="list-group-item"><strong>Created:</strong> {$job->created_at}</li>
+                        <li class="list-group-item"><strong>Number of sent mails:</strong> {$total_sent}</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="zmdi zmdi-equalizer"></i> Job summary</h2>
+                </div>
+                <div class="card-body">
+                    {control jobStats}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{snippetArea batchesWrapper}
+{foreach $job->related('mail_job_batch') as $batch}
+    <div class="well">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card z-depth-1">
+                    <div class="card-header">
+                        <h2><i class="zmdi zmdi-collection-item"></i> Batch #{$batch->id}</h2>
+                        <div class="actions actions-relative">
+                            <a n:href="EditBatch $batch->id" n:if="in_array($batch->status, [created, updated, ready])">
+                                <button type="button" class="btn palette-Cyan bg waves-effect m-b-5"><i class="zmdi zmdi-edit"></i> Edit</button>
+                            </a>
+                            <a href="#new-template-form-batch-{$batch->id}" data-toggle="collapse">
+                                <button type="button" class="btn palette-Cyan bg waves-effect m-b-5"><i class="zmdi zmdi-plus-circle"></i> Add email variant</button>
+                            </a>
+                            <a n:if="$batch->sent_emails == 0" n:href="RemoveBatch! $batch->id">
+                                <button type="button" class="btn palette-Cyan bg waves-effect m-b-5"><i class="zmdi zmdi-close"></i> Remove</button>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        {if $batch->related('mail_job_batch_templates')->count('*') > 0}
+                            <div class="m-tbl-15">
+                                {ifAllowed $user, 'batch', 'start'}
+                                <a n:if="in_array($batch->status, ['created', 'processed'])" n:href="SetBatchReadyToSend! $batch->id" class="btn bg palette-Cyan-600 btn-icon-text waves-effect">
+                                    <i class="zmdi zmdi-play"></i> {if $batch->start_at < new Nette\Utils\DateTime()}START SENDING NOW{else}START SENDING AT THE SCHEDULED TIME{/if} <span n:if="$batch->status === 'processed'">({$batchPreparedEmailsStats[$batch->id] ?? 0})</span>
+                                </a>
+                                {/ifAllowed}
+
+                                {ifAllowed $user, 'batch', 'start'}
+                                <a n:if="in_array($batch->status, ['worker_stopped', 'user_stopped'])" n:href="SetBatchSend! $batch->id" class="btn bg palette-Cyan-600 btn-icon-text waves-effect"><i class="zmdi zmdi-play"></i> CONTINUE SENDING</a>
+                                {/ifAllowed}
+
+                                {ifAllowed $user, 'batch', 'stop'}
+                                <a n:if="in_array($batch->status, ['processing', 'queued', 'sending'])" n:href="SetBatchUserStop! $batch->id" class="btn bg palette-Pink-400 btn-icon-text waves-effect"><i class="zmdi zmdi-pause"></i> PAUSE SENDING</a>
+                                {/ifAllowed}
+
+                                <a n:if="in_array($batch->status, ['ready_to_process_and_send'])" n:href="SetBatchCreated! $batch->id" class="btn bg palette-Pink-400 btn-icon-text waves-effect"><i class="zmdi zmdi-pause"></i> PAUSE SENDING</a>
+                                <a n:if="in_array($batch->status, ['done'])" class="btn btn-default waves-effect" disabled="disabled">ALL SENT</a>
+
+                                {ifAllowed $user, 'batch', 'process'}
+                                <a n:if="in_array($batch->status, ['created'])" n:href="SetBatchReadyToProcess! $batch->id" class="btn bg palette-Cyan-600 btn-icon-text waves-effect" data-toggle="tooltip" data-placement="top" title="Prepares set of recipients but doesn't send any emails. Use to get number of total recipients."><i class="zmdi zmdi-brightness-5"></i> PREPARE QUEUE</a>
+                                {/ifAllowed}
+                            </div>
+                        {/if}
+                        <ul class="list-group">
+                            <li class="list-group-item"><strong>Status:</strong> {$batch->status}</li>
+                            <li class="list-group-item"><strong>Method:</strong> {$batch->method}</li>
+                            <li class="list-group-item">
+                                <strong>Newsletter list:</strong>
+                                {var $jobTemplate = $batch->related('mail_job_batch_templates')->fetch()}
+                                {if $jobTemplate}
+                                    {$jobTemplate->mail_template->mail_type->title}{if $job->mail_type_variant} / {$job->mail_type_variant->title}{/if}
+                                {/if}
+                            </li>
+                            <li n:if="!empty($batch->max_emails)" class="list-group-item"><strong>Max number of sent emails:</strong> {$batch->max_emails}</li>
+                            <li class="list-group-item"><strong>Start at:</strong> {$batch->start_at}</li>
+                            <li class="list-group-item"><strong>Number of sent mails:</strong> {$batch->sent_emails}</li>
+                            <li class="list-group-item"><strong>Number of unsubscribed:</strong> {$batchUnsubscribeStats[$batch->id] ?? 0}</li>
+                            <li class="list-group-item"><strong>Number of errors:</strong> {$batch->errors_count}</li>
+                            <li class="list-group-item"><strong>Started:</strong> {$batch->first_email_sent_at}</li>
+                            <li class="list-group-item"><strong>Ended:</strong> {$batch->last_email_sent_at}</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card collapse z-depth-1" id="new-template-form-batch-{$batch->id}">
+                    {snippet batches-{$batch->id}}
+                    <div class="card-header">
+                        <h2>Add Email</h2>
+                        <ul class="actions">
+                            <li>
+                                <a href="#new-template-form-batch-{$batch->id}" data-toggle="collapse"><i class="zmdi zmdi-close"></i></a>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-body card-padding">
+                        {include '@form_new_template.latte', batchId => $batch->id}
+                    </div>
+                    {/snippet}
+                </div>
+
+                <div n:if="$batch->related('mail_job_batch_templates')->count('*') > 1">
+                    <div class="card z-depth-1">
+                        <div class="card-header">
+                            <h2><i class="zmdi zmdi-compass"></i> A/B test evaluation</h2>
+                        </div>
+                        {control batchExperimentEvaluation $batch->id}
+                    </div>
+                </div>
+                <div n:foreach="$batch->related('mail_job_batch_templates') as $email" class="card z-depth-1">
+                    <div class="card-header">
+                        <h2><i class="zmdi zmdi-equalizer"></i> Variant summary <small class="m-t-20"><span class="text-muted">{$email->mail_template->name}: {$email->mail_template->subject}</span> {$email->mail_template->code}</small></h2>
+                        <div class="actions">
+                            <a n:href="Template:Show $email->mail_template->id" target="_blank">
+                                <button type="button" class="btn palette-Cyan bg waves-effect"><i class="zmdi zmdi-eye"></i> Show email</button>
+                            </a>
+                            <a n:href="RemoveTemplate! $email->id">
+                                <button type="button" class="btn palette-Cyan bg waves-effect"><i class="zmdi zmdi-edit"></i> Remove email</button>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        {var $id = $email->id}
+                        {control jobBatchTemplateStats-{$id}}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+{/foreach}
+{/snippetArea}

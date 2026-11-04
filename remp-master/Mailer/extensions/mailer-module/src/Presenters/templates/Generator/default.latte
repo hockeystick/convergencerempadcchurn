@@ -1,0 +1,17 @@
+{layout '../@layout.latte'}
+
+{block #title}
+    Generator templates
+{/block}
+
+{block #content}
+
+<div class="card">
+    <div class="card-header">
+        <h2>Generator templates</h2>
+        <div class="actions">
+            <a n:href="new" class="btn palette-Cyan bg waves-effect">Add new generator template</a>
+        </div>
+    </div>
+    {control dataTableDefault}
+</div>

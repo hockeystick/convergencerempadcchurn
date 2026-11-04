@@ -1,0 +1,99 @@
+{layout '../@layout.latte'}
+
+{block #content}
+
+<div class="c-header">
+    <h2>Emails</h2>
+</div>
+<div class="card">
+    <div class="card-header">
+        <div class="row">
+            <div class="col-lg-4">
+            <h2 n:block="title">Show email <small>{$mailTemplate->name}</small></h2>
+            </div>
+        </div>
+
+        <div class="actions">
+            <a n:href="Edit $mailTemplate->id">
+                <button type="button" class="btn palette-Cyan bg waves-effect"><i class="zmdi zmdi-edit"></i> Edit</button>
+            </a>
+            <a n:href="Duplicate! $mailTemplate->id">
+                <button type="button" class="btn palette-Cyan bg waves-effect"><i class="zmdi zmdi-copy"></i> Duplicate</button>
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h2>Settings</h2>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    <li class="list-group-item"><strong>Code:</strong> {$mailTemplate->code}</li>
+                    <li class="list-group-item"><strong>Layout:</strong> <a n:href="Layout:Edit $mailTemplate->mail_layout_id">{$mailTemplate->mail_layout->name}</a></li>
+                    <li class="list-group-item"><strong>List:</strong> <a n:href="List:Show $mailTemplate->mail_type_id">{$mailTemplate->mail_type->title}</a></li>
+                    <li class="list-group-item"><strong>Created:</strong> {$mailTemplate->created_at}</li>
+                    <li class="list-group-item"><strong>Updated:</strong> {$mailTemplate->updated_at}</li>
+                    <li class="list-group-item" n:if="$mailTemplate->description"><strong>Description:</strong> {$mailTemplate->description}</li>
+                    <li class="list-group-item" n:if="$mailTemplate->copy_from"><strong>Copy From:</strong> <a n:href="show $mailTemplate->copy_from">{$mailTemplate->ref('copy_from')->name}</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h2>Test Email</h2>
+            </div>
+            <div class="card-body card-padding">
+                {include '@form_template_test.latte'}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="zmdi zmdi-equalizer"></i> Template summary</h2>
+            </div>
+            <div class="card-body">
+                {control templateStats, $mailTemplate->id}
+            </div>
+        </div>
+
+        <div class="card" n:if="$isClickTrackerEnabled">
+            <div class="card-header">
+                <h2><i class="zmdi zmdi-equalizer"></i> Links summary</h2>
+            </div>
+            <div class="card-body">
+                {control mailLinkStats, $mailTemplate->id}
+            </div>
+        </div>
+
+        <ul n:if="$langs" class="tab-nav m-t-30" role="tablist" data-tab-color="teal">
+            <li class="active">
+                <a href="#tab-{$locale}" role="tab" data-toggle="tab" aria-expanded="true">Default content ({$locale})</a>
+            </li>
+            <li n:foreach="$langs as $lang">
+                <a href="#tab-{$lang}" role="tab" data-toggle="tab" aria-expanded="false">{$lang}</a>
+            </li>
+        </ul>
+
+        <div class="card">
+            <div class="tab-content p-t-0">
+                {include 'show_source.latte', template => $mailTemplate, lang => $locale}
+                {foreach $langs as $lang}
+                    {include 'show_source.latte', template => $mailTemplate, lang => $lang}
+                {/foreach}
+            </div>
+        </div>
+        {*<div class="card">*}
+            {*<div class="card-header">*}
+                {*<h2>Log</h2>*}
+            {*</div>*}
+            {*<div class="card-body">*}
+                {*{control dataTableLogs}*}
+            {*</div>*}
+        {*</div>*}
+    </div>
+</div>

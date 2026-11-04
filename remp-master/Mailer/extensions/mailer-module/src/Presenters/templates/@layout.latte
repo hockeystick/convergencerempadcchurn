@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<!--[if IE 9 ]><html class="ie9"><![endif]-->
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{ifset title}{include title|stripHtml} | {/ifset} REMP Mailer</title>
+
+    <link rel="apple-touch-icon" sizes="57x57" href="{webpack /favicon/apple-icon-57x57.png}">
+    <link rel="apple-touch-icon" sizes="60x60" href="{webpack /favicon/apple-icon-60x60.png}">
+    <link rel="apple-touch-icon" sizes="72x72" href="{webpack /favicon/apple-icon-72x72.png}">
+    <link rel="apple-touch-icon" sizes="76x76" href="{webpack /favicon/apple-icon-76x76.png}">
+    <link rel="apple-touch-icon" sizes="114x114" href="{webpack /favicon/apple-icon-114x114.png}">
+    <link rel="apple-touch-icon" sizes="120x120" href="{webpack /favicon/apple-icon-120x120.png}">
+    <link rel="apple-touch-icon" sizes="144x144" href="{webpack /favicon/apple-icon-144x144.png}">
+    <link rel="apple-touch-icon" sizes="152x152" href="{webpack /favicon/apple-icon-152x152.png}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{webpack /favicon/apple-icon-180x180.png}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{webpack /favicon/android-icon-192x192.png}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{webpack /favicon/favicon-32x32.png}">
+    <link rel="icon" type="image/png" sizes="96x96" href="{webpack /favicon/favicon-96x96.png}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{webpack /favicon/favicon-16x16.png}">
+    <link rel="manifest" href="{webpack /favicon/manifest.json}">
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-TileImage" content="{webpack /favicon/ms-icon-144x144.png}">
+
+    <!-- Vendor CSS -->
+    <link href="{webpack /css/vendor.css}" rel="stylesheet">
+    <link href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.11.0/styles/github-gist.min.css" rel="stylesheet">
+
+    <!-- CSS -->
+    <link href="{webpack /css/app.css}" rel="stylesheet">
+
+    <!-- SCRIPT -->
+    <script src="{webpack /js/manifest.js}"></script>
+    <script src="{webpack /js/vendor.js}"></script>
+    <script src="{webpack /js/app.js}"></script>
+
+    <script type="text/javascript">
+        moment.locale({$locale});
+    </script>
+</head>
+
+<body data-ma-header="cyan-600">
+
+<div class="remp-menu">
+    <nav class="navbar navbar-default">
+        <div class="container-fluid">
+            <div class="navbar-header">
+                <a class="navbar-brand" href="/">
+                    <div class="svg-logo"></div>
+                </a>
+            </div>
+            <ul class="nav navbar-nav navbar-remp display-on-computer">
+                <li n:class="$service[url] == '/' ? active" n:foreach="$linkedServices as $key => $service">
+                    <a n:ifset="$service[url]" href="{$service[url]}"><i class="zmdi zmdi-{$service[icon]} zmdi-hc-fw"></i> {$key}</a>
+                </li>
+            </ul>
+
+            <ul class="nav navbar-nav navbar-right">
+                <li class="dropdown hm-profile">
+                    <a data-toggle="dropdown" href="">
+                        {if $currentUser->isLoggedIn()}
+                        <img src="https://www.gravatar.com/avatar/{md5(strtolower($currentUser->getIdentity()->data['email']))}?s=45&d=mm" alt="">
+                        {/if}
+                    </a>
+
+                    <ul class="dropdown-menu pull-right dm-icon">
+                        {*<li>*}
+                        {*<a href="#"><i class="zmdi zmdi-account"></i> View Profile</a>*}
+                        {*</li>*}
+                        <li>
+                            <a n:href="Settings:default"><i class="zmdi zmdi-settings"></i> Settings</a>
+                        </li>
+                        {*<li>*}
+                        {*<a n:href="Sign:Out"><i class="zmdi zmdi-time-restore"></i> Logout</a>*}
+                        {*</li>*}
+                    </ul>
+                </li>
+            </ul>
+
+            <ul class="nav navbar-right display-on-computer">
+                <li>
+                    {control applicationStatus}
+                </li>
+            </ul>
+        </div>
+    </nav>
+</div>
+
+<header id="header" class="media">
+    <div class="pull-left h-logo">
+        <a n:href="Dashboard:default" class="hidden-xs"></a>
+
+        <div class="menu-collapse" data-ma-action="sidebar-open" data-ma-target="main-menu">
+            <div class="mc-wrap">
+                <div class="mcw-line top palette-White bg"></div>
+                <div class="mcw-line center palette-White bg"></div>
+                <div class="mcw-line bottom palette-White bg"></div>
+            </div>
+        </div>
+    </div>
+
+    <ul class="pull-right h-menu">
+        <li class="hm-search-trigger">
+            <a href="" data-ma-action="search-open">
+                <i class="hm-icon zmdi zmdi-search"></i>
+            </a>
+        </li>
+    </ul>
+
+    <div class="media-body h-search site-search">
+        <form class="p-relative">
+            <div class="typeahead__container">
+                <div class="typeahead__field">
+                    <div class="preloader pl-lg pls-teal">
+                        <svg class="pl-circular" viewBox="25 25 50 50">
+                            <circle class="plc-path" cx="50" cy="50" r="20"></circle>
+                        </svg>
+                    </div>
+                    <input class="js-typeahead hs-input typeahead"
+                           name="q"
+                           autocomplete="off"
+                           placeholder="Search for emails, jobs, newsletter lists and layouts">
+                    <i class="zmdi zmdi-search hs-reset" data-ma-action="search-clear"></i>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="clearfix"></div>
+</header>
+
+<section id="main">
+    <aside id="s-main-menu" class="sidebar">
+        <ul class="main-menu">
+            <li n:class="$presenter->isLinkCurrent('Dashboard:*') ? active"><a n:href="Dashboard:default"><i class="zmdi zmdi-balance"></i> Dashboard</a></li>
+            <li n:class="$presenter->isLinkCurrent('Template:*') ? active"><a n:href="Template:default"><i class="zmdi zmdi-email"></i> Emails</a></li>
+            <li n:class="$presenter->isLinkCurrent('Layout:*') ? active"><a n:href="Layout:default"><i class="zmdi zmdi-view-day"></i> Layouts</a></li>
+            <li n:class="$presenter->isLinkCurrent('Snippet:*') ? active"><a n:href="Snippet:default"><i class="zmdi zmdi-view-quilt"></i> Snippets</a></li>
+            <li n:class="$presenter->isLinkCurrent('List:*') || $presenter->isLinkCurrent('ListCategory:*') ? active"><a n:href="List:default"><i class="zmdi zmdi-arrow-split"></i> Newsletter lists</a></li>
+            <li n:class="sub-menu, $presenter->isLinkCurrent('Generator:*') || $presenter->isLinkCurrent('MailGenerator:*') ? active">
+                <a href="#" data-ma-action="submenu-toggle"><i class="zmdi zmdi-case"></i> Generators</a>
+                <ul>
+                    <li n:class="$presenter->isLinkCurrent('Generator:*') ? active">
+                        <a n:href="Generator:default">Templates</a>
+                    </li>
+                    <li n:class="$presenter->isLinkCurrent('MailGenerator:*') ? active">
+                        <a n:href="MailGenerator:default">Generate emails</a>
+                    </li>
+                </ul>
+            </li>
+            <li class="m-b-15"></li>
+            <li n:class="$presenter->isLinkCurrent('Job:*') ? active"><a n:href="Job:default"><i class="zmdi zmdi-refresh"></i> Jobs</a></li>
+            <li n:class="$presenter->isLinkCurrent('Log:*') ? active"><a n:href="Log:default"><i class="zmdi zmdi-view-list-alt"></i> Log</a></li>
+        </ul>
+    </aside>
+
+    <section id="content">
+        <div class="container">
+            {include content}
+        </div>
+    </section>
+
+    <footer id="footer">
+        <p>Thank you for using <a href="https://remp2020.com/" title="Readers’ Engagement and Monetization Platform | Open-source tools for publishers">REMP</a>, open-source software by Denník N.</p>
+    </footer>
+</section>
+
+<!-- Older IE warning message -->
+<!--[if lt IE 9]>
+<div class="ie-warning">
+    <h1 class="c-white">Warning!!</h1>
+    <p>You are using an outdated version of Internet Explorer, please upgrade <br/>to any of the following web browsers to access this website.</p>
+    <div class="iew-container">
+        <ul class="iew-download">
+            <li>
+                <a href="http://www.google.com/chrome/">
+                    <img src="img/browsers/chrome.png" alt="">
+                    <div>Chrome</div>
+                </a>
+            </li>
+            <li>
+                <a href="https://www.mozilla.org/en-US/firefox/new/">
+                    <img src="img/browsers/firefox.png" alt="">
+                    <div>Firefox</div>
+                </a>
+            </li>
+            <li>
+                <a href="http://www.opera.com">
+                    <img src="img/browsers/opera.png" alt="">
+                    <div>Opera</div>
+                </a>
+            </li>
+            <li>
+                <a href="https://www.apple.com/safari/">
+                    <img src="img/browsers/safari.png" alt="">
+                    <div>Safari</div>
+                </a>
+            </li>
+            <li>
+                <a href="http://windows.microsoft.com/en-us/internet-explorer/download-ie">
+                    <img src="img/browsers/ie.png" alt="">
+                    <div>IE (New)</div>
+                </a>
+            </li>
+        </ul>
+    </div>
+    <p>Sorry for the inconvenience!</p>
+</div>
+<![endif]-->
+
+<!-- Javascript Libraries -->
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.11.0/highlight.min.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+<script>salvattore.init();</script>
+
+<script>
+    $(function() {
+        var delay = 0;
+        {foreach $flashes as $flash}
+        delay += 500;
+        window.setTimeout(function() {
+            $.notify({
+                message: {$flash->message}
+            }, {
+                allow_dismiss: false,
+                type: {$flash->type}
+            });
+        }, delay);
+        {/foreach}
+    });
+</script>
+{block javascript}{/block}
+</body>
+</html>

@@ -1,0 +1,68 @@
+{layout '../@layout.latte'}
+
+{block #content}
+
+<div class="c-header">
+    <h2 n:block="title">Mail logs</h2>
+</div>
+<div class="card">
+    <div class="card-header">
+        <h2>List of mail logs<small></small></h2>
+        {form filterLogsForm}
+            <div class="row">
+                <div class="col-md-2">
+                    <div class="form-group fg-float">
+                        <div class="fg-line" data-toggle="tooltip" data-placement="top" title="You have to enter full email address.">
+                            {input email, class => 'form-control fg-input'}
+                            {label email, class => 'fg-label' /}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group fg-float">
+                        <div class="fg-line">
+                            {input mail_template_code, class => 'form-control fg-input'}
+                            {label mail_template_code, class => 'fg-label' /}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group fg-float">
+                        <div class="fg-line">
+                            {input created_at_from, class => 'form-control fg-input created-at-time-picker'}
+                            {label created_at_from, class => 'fg-label' /}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group fg-float">
+                        <div class="fg-line">
+                            {input created_at_to, class => 'form-control fg-input created-at-time-picker'}
+                            {label created_at_to, class => 'fg-label' /}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2 text-right">
+                    {input send, class => 'btn btn-info waves-effect m-r-10'}
+                    {input cancel, class => 'btn btn-default waves-effect'}
+                </div>
+            </div>
+        {/form}
+
+    </div>
+    {control dataTableDefault}
+</div>
+
+<style>
+    .form-logs-filter {
+        margin-top: 30px;
+    }
+</style>
+
+<script>
+    $(function () {
+        $('.created-at-time-picker').datetimepicker({
+            format: 'MM/DD/YYYY HH:mm A'
+        })
+    });
+</script>

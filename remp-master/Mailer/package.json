@@ -1,0 +1,41 @@
+{
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "https://github.com/remp2020/remp/blob/master/LICENSE.md"
+    }
+  ],
+  "private": true,
+  "scripts": {
+    "dev": "cross-env MAILER_MODULE_PATH=extensions/mailer-module mix --mix-config=extensions/mailer-module/webpack.mix.js",
+    "watch": "cross-env MAILER_MODULE_PATH=extensions/mailer-module mix watch --mix-config=extensions/mailer-module/webpack.mix.js",
+    "watch-poll": "cross-env MAILER_MODULE_PATH=extensions/mailer-module mix watch --mix-config=extensions/mailer-module/webpack.mix.js -- --watch-options-poll=1000",
+    "hot": "cross-env MAILER_MODULE_PATH=extensions/mailer-module mix watch --hot --mix-config=extensions/mailer-module/webpack.mix.js",
+    "production": "cross-env MAILER_MODULE_PATH=extensions/mailer-module mix --production --mix-config=extensions/mailer-module/webpack.mix.js"
+  },
+  "engines": {
+    "node": ">=18",
+    "npm": ">=9",
+    "yarn": ">=2"
+  },
+  "packageManager": "yarn@2.4.3",
+  "dependencies": {
+    "mailer-module": "file:extensions/mailer-module"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.0",
+    "cross-env": "^7.0",
+    "css-loader": "^5.2.6",
+    "laravel-mix": "^6.0",
+    "postcss": "^8.2.8",
+    "resolve-url-loader": "^3.1",
+    "sass": "^1.17.4",
+    "sass-loader": "^10.0",
+    "vue-loader": "^15.9.7",
+    "vue-template-compiler": "^2.6.14",
+    "webpack": "^5.0.0"
+  },
+  "resolutions": {
+    "@remp/js-commons": "portal:../Package/remp"
+  }
+}

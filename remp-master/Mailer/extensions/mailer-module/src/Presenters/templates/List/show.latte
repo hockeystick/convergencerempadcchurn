@@ -1,0 +1,193 @@
+{layout '../@layout.latte'}
+
+{block #content}
+
+<style>
+    a.disabled {
+        cursor: not-allowed;
+    }
+</style>
+
+<div class="c-header">
+    <h2>Newsletter lists</h2>
+</div>
+<div class="card">
+    <div class="card-header">
+        <h2 n:block="title">Show newsletter list <span class="text-muted"></span> <small>{$list->title}</small></h2>
+        <div class="actions">
+            <a href="{$list->preview_url}" n:class="!$list->preview_url ? 'disabled'" target="_blank" data-toggle="tooltip" data-placement="top" n:attr="title: !$list->preview_url ? 'Preview URL not configured.'">
+                <button type="button" class="btn palette-Cyan bg waves-effect {!$list->preview_url ? 'disabled'}"><i class="zmdi zmdi-search"></i> Preview</button>
+            </a>
+            <a href="{$list->image_url}" n:class="!$list->image_url ? 'disabled'" target="_blank" data-toggle="tooltip" data-placement="top" n:attr="title: !$list->image_url ? 'List image not configured.'">
+                <button type="button" class="btn palette-Cyan bg waves-effect {!$list->image_url ? 'disabled'}"><i class="zmdi zmdi-image-o"></i> List image</button>
+            </a>
+            <a n:href="sentEmailsDetail $list->id">
+                <button type="button" class="btn palette-Cyan bg waves-effect"><i class="zmdi zmdi-chart"></i> Sent emails</button>
+            </a>
+            <a n:href="edit $list->id">
+                <button type="button" class="btn palette-Cyan bg waves-effect"><i class="zmdi zmdi-edit"></i> Edit</button>
+            </a>
+        </div>
+    </div>
+    <div class="card-body card-padding">
+    </div>
+</div>
+
+
+<div class="card">
+    <div class="card-header">
+        <h2>Subscribed users</h2>
+
+        <div class="actions">
+            <a n:href="Dashboard:default" class="btn palette-Cyan bg waves-effect">Back to dashboard</a>
+        </div>
+    </div>
+
+    <div class="p-30">
+        <canvas id="mailer-dashboard-detail-statistics-graph" width="1500" height="400"></canvas>
+    </div>
+
+    <script>
+        var ctx = document.getElementById("mailer-dashboard-detail-statistics-graph").getContext('2d');
+        var myLineChart = new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels: {$labels},
+                datasets: [{$dataSet}],
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        type: "timeseries",
+                        time: {
+                            displayFormats: {
+                                "day": "ll",
+                            },
+                            unit: "day",
+                            tooltipFormat: "LL",
+                        }
+                    },
+                    y: {
+                        type: 'linear',
+                        min: {$suggestedMin ?? null},
+                    },
+                },
+            }
+        });
+    </script>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h2>Settings</h2>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    <li class="list-group-item"><strong>Category:</strong> {$list->type_category->title}</li>
+                    <li class="list-group-item"><strong>Priority:</strong> {$list->priority}</li>
+                    <li class="list-group-item"><strong>Code:</strong> {$list->code}</li>
+                    <li class="list-group-item"><strong>From:</strong> {$list->mail_from}</li>
+                    <li class="list-group-item"><strong>Description:</strong> {$list->description|noescape}</li>
+                    <li class="list-group-item"><strong>Auto subscribe:</strong> {$list->auto_subscribe|yesNo}</li>
+                    <li class="list-group-item"><strong>Locked:</strong> {$list->locked|yesNo}</li>
+                    <li class="list-group-item"><strong>Publicly listed:</strong> {$list->public_listing|yesNo}</li>
+                    <li class="list-group-item"><strong>Welcome e-mail:</strong> {ifset $list->subscribe_mail_template} <a n:href="Template:Show $list->subscribe_mail_template_id">{$list->subscribe_mail_template->subject}</a>{else}No{/ifset}</li>
+                    <li class="list-group-item"><strong>Goodbye e-mail:</strong> {ifset $list->unsubscribe_mail_template} <a n:href="Template:Show $list->unsubscribe_mail_template_id">{$list->unsubscribe_mail_template->subject}</a>{else}No{/ifset}</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h2>Stats</h2>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <tbody>
+                    <tr>
+                        <td><strong>Number of subscribed:</strong></td>
+                        <td>{$stats['subscribed']|number}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Number of un-subscribed:</strong></td>
+                        <td>{$stats['un-subscribed']|number}</td>
+                    </tr>
+                    </tbody>
+                </table>
+                <hr>
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>Unique subscribers</th>
+                        <th>last 7 days</th>
+                        <th>last 30 days</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td><strong>Number of opened</strong></td>
+                        <td>{$stats['opened']['7-days']|number}</td>
+                        <td>{$stats['opened']['30-days']|number}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Number of clicked</strong></td>
+                        <td>{$stats['clicked']['7-days']|number}</td>
+                        <td>{$stats['clicked']['30-days']|number}</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{var $hasVariantsTab = $list->related('mail_type_variants')->where('deleted_at', null)->count('*')}
+
+<div class="row">
+    <div class="col-md-12">
+        <div role="tabpanel">
+            <ul class="tab-nav" role="tablist">
+                <li class="active"><a href="#templates" aria-controls="templates" role="tab" data-toggle="tab" aria-expanded="true">
+                    <i class="zmdi zmdi-email"></i> Emails
+                </a></li>
+                <li n:if="$hasVariantsTab"><a href="#variants" aria-controls="variants" role="tab" data-toggle="tab">
+                    <i class="zmdi zmdi zmdi-arrow-split"></i> Variants
+                </a></li>
+                <li><a href="#subscribers" aria-controls="subscribers" role="tab" data-toggle="tab">
+                    <i class="zmdi zmdi zmdi-accounts-list-alt"></i> Subscribers</a>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <div role="tabpanel" class="tab-pane active" id="templates">
+                    <div class="card">
+                        <div class="card-body">
+                            {control dataTableTemplates}
+                        </div>
+                    </div>
+                </div>
+                <div n:if="$hasVariantsTab" role="tabpanel" class="tab-pane" id="variants">
+                    {control dataTableVariants}
+                </div>
+                <div role="tabpanel" class="tab-pane" id="subscribers">
+                    <div class="card">
+                        <div class="card-body">
+                            {control dataTableSubscriberEmails}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $('.actions').on('click', 'a.disabled', function(e) {
+        e.preventDefault()
+    })
+</script>

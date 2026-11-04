@@ -1,0 +1,41 @@
+{
+  "name": "remp/laravel-widgets",
+  "description": "Laravel Widgets",
+  "keywords": ["laravel", "remp", "widgets"],
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "rootpd",
+      "email": "dulacka@gmail.com"
+    }
+  ],
+  "require": {
+    "php": "^8.2",
+    "arrilot/laravel-widgets": "^3.9",
+    "illuminate/support": "^v12.0",
+    "ramsey/uuid": "^4.0"
+  },
+  "require-dev": {
+  },
+  "autoload": {
+    "psr-4": {
+      "Remp\\Widgets\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Remp\\Widgets\\Providers\\WidgetServiceProvider"
+      ]
+    }
+  },
+  "config": {
+    "preferred-install": "dist",
+    "sort-packages": true,
+    "optimize-autoloader": true
+  }
+}

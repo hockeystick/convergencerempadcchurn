@@ -1,0 +1,204 @@
+{layout '../@layout.latte'}
+
+{block content}
+{include jsInit}
+
+<style>
+    .field_error {
+        display: block;
+        padding: 2px 5px;
+        color: white;
+        background-color: #f44336;
+    }
+</style>
+
+<div class="c-header">
+    <h2>Emails</h2>
+</div>
+
+<div class="row">
+    <div class="col-sm-6">
+        <div class="card">
+            <div class="card-header">
+                <div class="row">
+                    <div class="col-lg-4">
+                        <h2 n:block="title">Edit email <small>{$mailTemplate->name}</small></h2>
+                    </div>
+                </div>
+                <div class="actions">
+                    <a n:href="Show $mailTemplate->id">
+                        <button type="button" class="btn palette-Cyan bg waves-effect"><i class="zmdi zmdi-eye"></i> View</button>
+                    </a>
+                </div>
+            </div>
+            {form templateForm}
+
+                {include 'jsValidation.latte', form => $form}
+                {input id}
+
+                <div class="card-body card-padding">
+                <div role="tabpanel">
+                    <ul class="tab-nav" role="tablist">
+                        <li class="inactive">
+                            <a href="#general" aria-controls="general" role="tab" data-toggle="tab" aria-expanded="true">General</a>
+                        </li>
+                        <li n:class="$editedLocale ? controlled">
+                            <a href="#email" data-url="{plink this editedLocale => null}" aria-controls="tab-{$locale}" {if $editedLocale === null}role="tab" data-toggle="tab"{/if} aria-expanded="false">Default content ({$locale})</a>
+                        </li>
+                        <li n:foreach="$langs as $lang" class="controlled">
+                            <a href="#email" data-url="{plink this editedLocale => $lang}" aria-controls="tab-{$lang}" {if $lang === $editedLocale}role="tab" data-toggle="tab"{/if} aria-expanded="false">{$lang} content</a>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content p-10">
+                        <div role="tabpanel" class="tab-pane m-t-30" id="general">
+                            {include 'general.latte', form => $form}
+                        </div>
+
+                        <div role="tabpanel" class="tab-pane active" id="email">
+
+                            <div n:if="$editedLocale && $editedLocale !== $locale && !$mailTemplate->related('mail_template_translations', 'mail_template_id')->where('locale', $editedLocale)->fetch()" class="alert bg palette-Grey-200">
+                                <i class="zmdi zmdi-alert-circle-o"></i>
+                                <strong>{$lang}</strong> translation doesn't exist yet, default (<strong>{$locale}</strong>) is always used when sending the email
+                            </div>
+
+                            <div n:if="!$editedLocale || $editedLocale === $locale" class="alert bg palette-Grey-200">
+                                <i class="zmdi zmdi-alert-circle-o"></i>
+                                This content will be sent if <strong>{$locale}</strong> locale is used or another translation is not available.
+                            </div>
+
+                            <div class="form-group fg-float m-t-30">
+                                <div class="fg-line">
+                                    {input from, class => 'form-control fg-input'}
+                                    {label from, class => 'fg-label' /}
+                                </div>
+                            </div>
+
+                            <div class="form-group fg-float">
+                                <div class="fg-line">
+                                    {input subject, class => 'form-control fg-input'}
+                                    {label subject, class => 'fg-label' /}
+                                </div>
+                            </div>
+
+                            <div class="email-editors">
+                                <div class="editors-container">
+                                    <div class="fullscreen-edit-btn-div">
+                                        <button type="button" class="fullscreen-edit-btn btn palette-Cyan bg" data-sync="text"><i class="zmdi zmdi-fullscreen"></i> <span>Fullscreen edit</span></button>
+                                    </div>
+                                </div>
+                                <div class="textarea-group form-group fg-float">
+                                    <div class="fg-line">
+                                        {input mail_body_text, class => 'form-control fg-input auto-size textarea-editor'}
+                                            {label mail_body_text, class => 'fg-label' /}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="email-editors">
+                                <div class="editors-container">
+                                    <div class="fullscreen-edit-btn-div">
+                                        <button type="button" class="fullscreen-edit-btn btn palette-Cyan bg" data-sync="html"><i class="zmdi zmdi-fullscreen"></i> <span>Fullscreen edit</span></button>
+                                    </div>
+                                    <div class="m-b-10 editor-choice row">
+                                        <div class="js-editor-choice col-sm-7">
+                                            <label class="radio radio-inline m-r-20">
+                                                <input type="radio" name="js-editor-choice" value="code" {if $templateEditor != 'wysiwyg'}checked="checked"{/if} class="js-editor-choice">
+                                                <i class="input-helper"></i>
+                                                HTML Code View
+                                            </label>
+                                            <label class="radio radio-inline m-r-20" style="margin-left: 0;">
+                                                <input type="radio" name="js-editor-choice" value="editor" {if $templateEditor == 'wysiwyg'}checked="checked"{/if} class="js-editor-choice">
+                                                <i class="input-helper"></i>
+                                                Editor View (WYSIWYG)
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {input mail_body_html, class => 'form-control js-mail-body-html-input js-html-editor', data-snippets => json_encode($snippets) }
+                                <div class="js-codemirror"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div class="fg-line">
+                            {input save, class => 'btn btn-info waves-effect'}
+                        {input save_close, class => 'btn btn-info waves-effect'}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {/form}
+        </div>
+    </div>
+
+    <div id="email-edit-preview" class="col-sm-6">
+        <div class="card">
+            <div class="card-header">
+                <h2>Preview</h2>
+            </div>
+            <div class="card-body card-padding">
+                <div id="js-mail-preview">
+                    <mail-preview></mail-preview>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+    $('li.controlled').on('click', function(e) {
+        e.preventDefault();
+        let url = e.target.getAttribute('data-url');
+
+        if (formChanged) {
+            if (confirm('Please save your changes or will be lost. Are you sure you want to continue?')) {
+                window.location.href = url;
+            }
+            return;
+        }
+        window.location.href = url;
+    });
+
+    let lang = {$editedLocale ?? $locale};
+    if (lang) {
+        $(function() {
+            $('[aria-controls="tab-' + lang + '"]').tab('show');
+        });
+    }
+
+    let lists = {$lists};
+    let from = $("#" + {$control['templateForm']['from']->htmlId});
+    if (!from.val()) {
+        let mailTypeId = $("#" + {$control['templateForm']['mail_type_id']->htmlId}).val();
+        if (lists[mailTypeId].mail_from) {
+            from.val(lists[mailTypeId].mail_from);
+        }
+    }
+
+    let form = $("#" + {$control['templateForm']->getElementPrototype()->getId()});
+    let formChanged = false;
+    form.change(function() {
+        formChanged = true;
+    });
+</script>
+{/block}
+
+{define jsInit}
+    <script>
+        $(function() {
+            remplib.templateForm.init();
+
+            form.submit(function(event) {
+                event.preventDefault();
+
+                // unscrew (= return back) twig variables before submit
+                var jsMailBodyInput = $(remplib.templateForm.textareaSelector);
+                jsMailBodyInput.val(remplib.templateForm.unscrewTwig(remplib.templateForm.displayedMailContent));
+
+                form[0].submit();
+            });
+        });
+    </script>
+{/define}

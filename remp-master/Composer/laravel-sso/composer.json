@@ -1,0 +1,45 @@
+{
+  "name": "remp/laravel-sso",
+  "description": "A Laravel Package to integrate REMP SSO",
+  "keywords": ["laravel", "remp", "sso"],
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "rootpd",
+      "email": "dulacka@gmail.com"
+    }
+  ],
+  "require": {
+    "php": "^8.2",
+    "league/uri": "^7.5",
+    "league/uri-components": "^7.5",
+    "illuminate/auth": "^v12.0",
+    "illuminate/contracts": "^v12.0",
+    "illuminate/http": "^v12.0",
+    "illuminate/support": "^v12.0",
+    "guzzlehttp/guzzle": "^7.0"
+  },
+  "require-dev": {
+  },
+  "autoload": {
+    "psr-4": {
+      "Remp\\LaravelSso\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Remp\\LaravelSso\\Providers\\SsoServiceProvider"
+      ]
+    }
+  },
+  "config": {
+    "preferred-install": "dist",
+    "sort-packages": true,
+    "optimize-autoloader": true
+  }
+}

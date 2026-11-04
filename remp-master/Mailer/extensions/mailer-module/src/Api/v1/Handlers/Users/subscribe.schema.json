@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Subscribe user",
+  "$id": "POST /api/v1/users/subscribe",
+  "title": "Subscribe",
+  "examples": [{
+    "user_id": 1,
+    "email": "test@test.com",
+    "list_id": 1,
+    "variant_id": 1,
+    "send_accompanying_emails": true
+  },
+    {
+      "user_id": 1,
+      "email": "test@test.com",
+      "list_code": "123",
+      "variant_id": null
+    }],
+  "type": "object",
+  "required": [
+    "email",
+    "user_id"
+  ],
+  "anyOf": [
+    {
+      "title": "Required list_id",
+      "required": ["list_id"]
+    },
+    {
+      "title": "Required list_code",
+      "required": ["list_code"]
+    }
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "user_id": {
+      "type": "integer"
+    },
+    "email": {
+      "type": "string",
+      "format": "email"
+    },
+    "list_id": {
+      "type": "integer"
+    },
+    "list_code": {
+      "type": "string"
+    },
+    "variant_id": {
+      "type": "integer"
+    },
+    "variant_code": {
+      "type": "string"
+    },
+    "send_accompanying_emails": {
+      "type": "boolean"
+    },
+    "force_no_variant_subscription": {
+      "type": "boolean"
+    },
+    "rtm_params": {
+      "title": "RTM params",
+      "type": "object",
+      "properties": {
+        "rtm_source": {
+          "type": "string"
+        },
+        "rtm_medium": {
+          "type": "string"
+        },
+        "rtm_campaign": {
+          "type": "string"
+        },
+        "rtm_content": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

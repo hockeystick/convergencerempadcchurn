@@ -1,0 +1,17 @@
+{
+  "name": "remp/crm-churn-prediction-module",
+  "description": "CRM Churn Prediction Module",
+  "type": "library",
+  "homepage": "https://remp2030.com",
+  "license": "MIT",
+  "require": {
+    "php": "^8.3",
+    "google/cloud-bigquery": "^1.16"
+  },
+  "minimum-stability": "stable",
+  "autoload": {
+    "psr-4": {
+      "Crm\\ChurnPredictionModule\\": "src/"
+    }
+  }
+}

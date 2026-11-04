@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<!--[if IE 9 ]><html class="ie9"><![endif]-->
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{ifset title}{include title|stripHtml} | {/ifset} REMP Mailer</title>
+
+    <!-- Vendor CSS -->
+    <link href="{webpack /css/vendor.css}" rel="stylesheet">
+    <link href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.11.0/styles/github-gist.min.css" rel="stylesheet">
+
+    <!-- CSS -->
+    <link href="{webpack /css/app.css}" rel="stylesheet">
+
+    <!-- SCRIPT -->
+    <script src="{webpack /js/manifest.js}"></script>
+    <script src="{webpack /js/vendor.js}"></script>
+    <script src="{webpack /js/app.js}"></script>
+</head>
+
+<body>
+<div class="login" data-lbg="teal">
+    <!-- Login -->
+    <div class="l-block toggled" id="l-login">
+        <div class="lb-header palette-Teal bg">
+            <i class="zmdi zmdi-account-circle"></i>
+            Hi there! Please Sign in
+        </div>
+
+        <div class="lb-body">
+            {include '@signIn_form.latte'}
+        </div>
+    </div>
+</div>
+
+<!-- Older IE warning message -->
+<!--[if lt IE 9]>
+<div class="ie-warning">
+    <h1 class="c-white">Warning!!</h1>
+    <p>You are using an outdated version of Internet Explorer, please upgrade <br/>to any of the following web browsers to access this website.</p>
+    <div class="iew-container">
+        <ul class="iew-download">
+            <li>
+                <a href="http://www.google.com/chrome/">
+                    <div>Chrome</div>
+                </a>
+            </li>
+            <li>
+                <a href="https://www.mozilla.org/en-US/firefox/new/">
+                    <div>Firefox</div>
+                </a>
+            </li>
+            <li>
+                <a href="http://www.opera.com">
+                    <div>Opera</div>
+                </a>
+            </li>
+            <li>
+                <a href="https://www.apple.com/safari/">
+                    <div>Safari</div>
+                </a>
+            </li>
+            <li>
+                <a href="http://windows.microsoft.com/en-us/internet-explorer/download-ie">
+                    <div>IE (New)</div>
+                </a>
+            </li>
+        </ul>
+    </div>
+    <p>Sorry for the inconvenience!</p>
+</div>
+<![endif]-->
+
+<script type="application/javascript">
+    $(function() {
+        var index = 1000;
+        {foreach $flashes as $flash}
+        window.setTimeout(function() {
+            $.bootstrapPurr({$flash->message}, {
+                type: {$flash->type},
+                align: 'left',
+                allowDismiss: false,
+                width: 270,
+                offset: {
+                    from: 'bottom'
+                }
+            });
+        }, index);
+        index += 250;
+        {/foreach}
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+services:
+  nginx:
+    environment:
+      NGINX_PORT: "8000"
+    ports:
+      - "8000:80"
+
+  beam_tracker:
+    environment:
+      # see other ENV variables to override in Tracker's .env.example file
+      TRACKER_DEBUG: false
+
+  beam_segments:
+    environment:
+      # see other ENV variables to override in Segments' .env.example file
+      SEGMENTS_DEBUG: false
+
+  campaign:
+    environment:
+      XDEBUG_CONFIG: "client_host=host.docker.internal"
+      PHP_IDE_CONFIG: "serverName=campaign.remp.press"
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Linux Docker engine doesn't have this host by default
+
+    # Add these volumes only after initial installation (containers would otherwise override each other's cache).
+    # Also make sure, the host machine folders already exist; otherwise Docker would create them with root owner,
+    # and you might encounter permission issues.
+    #volumes:
+    #  - "/home/user/.cache/composer:/composer:rw"
+    #  - "/home/user/.cache/yarn:/yarn:rw"
+
+  mailer:
+    environment:
+      XDEBUG_CONFIG: "client_host=host.docker.internal"
+      PHP_IDE_CONFIG: "serverName=mailer.remp.press"
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Linux Docker engine doesn't have this host by default
+
+    # Add these volumes only after initial installation (containers would otherwise override each other's cache).
+    # Also make sure, the host machine folders already exist; otherwise Docker would create them with root owner,
+    # and you might encounter permission issues.
+    #volumes:
+    #  - "/home/user/.cache/composer:/composer:rw"
+    #  - "/home/user/.cache/yarn:/yarn:rw"
+
+  beam:
+    environment:
+      XDEBUG_CONFIG: "client_host=host.docker.internal"
+      PHP_IDE_CONFIG: "serverName=beam.remp.press"
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Linux Docker engine doesn't have this host by default
+
+    # Add these volumes only after initial installation (containers would otherwise override each other's cache).
+    # Also make sure, the host machine folders already exist; otherwise Docker would create them with root owner,
+    # and you might encounter permission issues.
+    #volumes:
+    #  - "/home/user/.cache/composer:/composer:rw"
+    #  - "/home/user/.cache/yarn:/yarn:rw"
+
+  sso:
+    environment:
+      XDEBUG_CONFIG: "client_host=host.docker.internal"
+      PHP_IDE_CONFIG: "serverName=sso.remp.press"
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Linux Docker engine doesn't have this host by default
+
+    # Add these volumes only after initial installation (containers would otherwise override each other's cache).
+    # Also make sure, the host machine folders already exist; otherwise Docker would create them with root owner,
+    # and you might encounter permission issues.
+    #volumes:
+    #  - "/home/user/.cache/composer:/composer:rw"
+    #  - "/home/user/.cache/yarn:/yarn:rw"

@@ -1,0 +1,19 @@
+{foreach $job->related('mail_job_batch_templates') as $jobBatchTemplate}
+    <div>
+        {var $count = $jobBatchTemplate->mail_template->mail_type
+            ->related('mail_user_subscriptions')
+            ->where([
+                'rtm_campaign' => $jobBatchTemplate->mail_template->code,
+                'rtm_content' => $jobBatchTemplate->mail_job_batch_id,
+            ])
+            ->count('*')
+        }
+
+        {if $jobBatchTemplate->sent > 0}
+        {var $percent = $count ? (100 * $count / $jobBatchTemplate->sent) : 0}
+        {else}
+        {var $percent = 0}
+        {/if}
+        {$count} <span class="percentage">({$percent|number:0}%)</span>
+    </div>
+{/foreach}

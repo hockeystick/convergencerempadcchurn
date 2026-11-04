@@ -1,0 +1,60 @@
+{
+    "name": "remp-mailer/mail-module",
+    "description": "REMP Mailer",
+    "type": "project",
+    "license": ["MIT"],
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "phpstan/extension-installer": true,
+            "php-http/discovery": true
+        }
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../Composer/*",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+          "type": "path",
+          "url": "extensions/*",
+          "options": {
+            "symlink": true
+          }
+        }
+    ],
+
+    "require": {
+        "php": "^8.2",
+        "remp/mailer-module": "@dev",
+        "remp/mailer-newrelic-module": "@dev"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.13",
+        "mockery/mockery": "^1.5",
+        "phpstan/extension-installer": "^1.1",
+        "phpstan/phpstan": "^2.1",
+        "phpstan/phpstan-mockery": "^2.0",
+        "phpstan/phpstan-nette": "^2.0",
+        "phpstan/phpstan-phpunit": "^2.0",
+        "phpunit/phpunit": "^11.5",
+        "spaze/phpstan-disallowed-calls": "^4.4",
+        "squizlabs/php_codesniffer": "^3.2",
+        "symfony/var-dumper": "^7.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Remp\\Mailer\\": "app/"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    }
+}

@@ -1,0 +1,89 @@
+.preview {
+    background-size: contain;
+    background-repeat: no-repeat;
+    height: 200px;
+    text-align: center;
+
+    &.medium-rectangle {
+        background-image: url('../img/medium_rectangle.png');
+        background-size: contain;
+        background-position: center;
+    }
+
+    &.overlay-rectangle {
+        background-image: url('../img/overlay_rectangle.png');
+        background-size: contain;
+        background-position: center;
+    }
+
+    &.overlay-two-buttons-signature {
+        background-image: url('../img/overlay_two_buttons_signature_overlay.png');
+        background-size: contain;
+        background-position: center;
+    }
+
+    &.bar {
+        background-image: url('../img/bar.png');
+        background-size: contain;
+        background-position: center;
+    }
+
+    &.collapsible-bar {
+        background-image: url('../img/collapsible_bar.png');
+        background-size: contain;
+        background-position: center;
+    }
+
+    &.short-message {
+        background-image: url('../img/short_message.png');
+        background-size: 80%;
+        background-position: center;
+    }
+
+    &.newsletter-rectangle {
+        background-image: url('../img/newsletter_rectangle.png');
+        background-size: 80%;
+        background-position: center;
+    }
+}
+
+
+
+.modal {
+    .card-header {
+        padding: 10px 20px;
+    }
+
+    .modal-header {
+        background-color: #00acc1;
+        color: white;
+    }
+
+    .modal-body {
+        background-color: #edecec;
+        padding-top: 15px;
+    }
+
+    .disabled .card-body {
+        opacity: 0.33;
+        filter: grayscale(100%);
+    }
+}
+
+#modal-template-select .card {
+    max-height: 274px;
+    height: 274px;
+}
+
+a.notifyLink {
+    color: #ccc;
+}
+
+a.notifyLink:hover {
+    color: #fff;
+}
+
+.app-info {
+    background: $primaryColor;
+    color: white;
+}

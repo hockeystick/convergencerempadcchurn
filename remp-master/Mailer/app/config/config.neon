@@ -1,0 +1,37 @@
+services:
+	- Remp\Mailer\Forms\NovydenikNewsfilterTemplateFormFactory('users_with_any_subscriptions', 'users-without-subscription')
+	- Remp\Mailer\Forms\NewsfilterTemplateFormFactory('users_with_active_subscriptions', 'users_without_actual_subscriptions')
+	- Remp\Mailer\Forms\MediaBriefingTemplateFormFactory('users_with_active_subscriptions', 'users_without_actual_subscriptions')
+	- Remp\Mailer\Forms\DennikeTemplateFormFactory('users_with_active_subscriptions', 'users_without_actual_subscriptions')
+	- Remp\Mailer\Forms\TldrTemplateFormFactory('users_with_active_subscriptions', 'users_without_actual_subscriptions')
+	- Remp\Mailer\Forms\MMSTemplateFormFactory('users_with_active_subscriptions', 'users_without_actual_subscriptions')
+	- Remp\Mailer\Forms\GrafdnaTemplateFormFactory('users_with_active_subscriptions', 'users_without_actual_subscriptions')
+	dailyMinuteTemplateFormFactory: Remp\Mailer\Forms\DailyMinuteTemplateFormFactory('minuta-daily-digest')
+	articleUrlParserTemplateFormFactory: Remp\Mailer\Forms\ArticleUrlParserTemplateFormFactory()
+	respektUrlParserTemplateFormFactory: Remp\Mailer\Forms\RespektUrlParserTemplateFormFactory
+	respektArticleParserTemplateFormFactory: Remp\Mailer\Forms\RespektArticleParserTemplateFormFactory
+
+	- Remp\Mailer\Components\GeneratorWidgets\Widgets\NewsfilterWidget\NewsfilterWidget
+	- Remp\Mailer\Components\GeneratorWidgets\Widgets\NovydenikNewsfilterWidget\NovydenikNewsfilterWidget
+	- Remp\Mailer\Components\GeneratorWidgets\Widgets\MediaBriefingWidget\MediaBriefingWidget
+	- Remp\Mailer\Components\GeneratorWidgets\Widgets\DennikeWidget\DennikeWidget
+	- Remp\Mailer\Components\GeneratorWidgets\Widgets\TldrWidget\TldrWidget
+	- Remp\Mailer\Components\GeneratorWidgets\Widgets\MMSWidget\MMSWidget
+	- Remp\Mailer\Components\GeneratorWidgets\Widgets\ArticleUrlParserWidget\ArticleUrlParserWidget
+	- Remp\Mailer\Components\GeneratorWidgets\Widgets\GrafdnaWidget\GrafdnaWidget
+	- Remp\Mailer\Components\GeneratorWidgets\Widgets\DailyMinuteWidget\DailyMinuteWidget
+	- Remp\Mailer\Components\GeneratorWidgets\Widgets\RespektUrlParserWidget\RespektUrlParserWidget
+	- Remp\Mailer\Components\GeneratorWidgets\Widgets\RespektArticleParserWidget\RespektArticleParserWidget
+
+	- Remp\Mailer\Models\WebClient(@environmentConfig::get('WEB_ADDR'))
+
+	- Remp\Mailer\Models\Generators\WordpressBlockParser
+
+	embedParser:
+		factory: Remp\Mailer\Models\Generators\EmbedParser
+
+	hermesWorker:
+		setup:
+			- add('user-subscribed', Remp\MailerModule\Hermes\TrackSubscribeUnsubscribeHandler())
+			- add('user-subscribed-variant', Remp\MailerModule\Hermes\TrackSubscribeUnsubscribeHandler())
+			- add('user-unsubscribed', Remp\MailerModule\Hermes\TrackSubscribeUnsubscribeHandler())

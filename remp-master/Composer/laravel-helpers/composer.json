@@ -1,0 +1,40 @@
+{
+  "name": "remp/laravel-helpers",
+  "description": "Laravel Helpers",
+  "keywords": ["laravel", "remp", "helpers"],
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "rootpd",
+      "email": "dulacka@gmail.com"
+    }
+  ],
+  "require": {
+    "php": "^8.2",
+    "illuminate/http": "^v12.0",
+    "illuminate/support": "^v12.0",
+    "illuminate/routing": "^v12.0"
+  },
+  "require-dev": {
+  },
+  "autoload": {
+    "files": [
+      "src/laravel_helpers.php"
+    ],
+    "psr-4": {
+      "Remp\\LaravelHelpers\\": "src/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Remp\\LaravelHelpers\\Providers\\HelperServiceProvider"
+      ]
+    }
+  },
+  "config": {
+    "preferred-install": "dist",
+    "sort-packages": true,
+    "optimize-autoloader": true
+  }
+}

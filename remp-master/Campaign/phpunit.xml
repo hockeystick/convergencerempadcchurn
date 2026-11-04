@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.5/phpunit.xsd"
+         backupGlobals="false"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+         processIsolation="false"
+         failOnWarning="true"
+         failOnRisky="true"
+         stderr="true"
+         stopOnFailure="false"
+         executionOrder="random"
+         cacheDirectory=".phpunit.cache"
+         backupStaticProperties="false"
+>
+  <testsuites>
+    <testsuite name="All">
+      <directory suffix="Test.php">tests/</directory>
+      <directory suffix="Test.php">vendor/remp/campaign-module/tests/</directory>
+    </testsuite>
+  </testsuites>
+  <php>
+    <env name="APP_ENV" value="testing"/>
+    <env name="REDIS_DEFAULT_DATABASE" value="15"/>
+    <env name="DB_DATABASE" value="remp_test"/>
+    <env name="DB_PASSWORD" value="secret"/>
+    <env name="DB_HOST" value="mysql"/>
+    <env name="CACHE_DRIVER" value="array"/>
+    <env name="SESSION_DRIVER" value="array"/>
+    <env name="QUEUE_CONNECTION" value="sync"/>
+  </php>
+</phpunit>
