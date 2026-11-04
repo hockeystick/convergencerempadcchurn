@@ -67,7 +67,7 @@ Three migrations listed in the dump do not exist on disk: `2019_01_29_142418_see
 | `accounts` | `2017_03_29_134957_accounts_table.php` | `id`, `uuid` (char 36), `name`. Index on `uuid` from `2017_09_07_124520_uuid_indices.php`. Not unique. |
 | `properties` | `2017_04_04_060513_properties_table.php` | `id`, `uuid`, `name`, `account_id` FK to `accounts.id`. Index on `uuid`. |
 
-The property `uuid` is the "property token" that the browser sends as `system.property_token`. The Tracker validates it against `SELECT * FROM properties WHERE uuid = ?` (`beam-go/model/property.go`, line 47). Pageview, commerce and custom event documents in Elasticsearch carry it as the field `token` (`beam-go/cmd/tracker/controller/track.go`, line 359). Entity and impression documents are validated against it but do not store it. Inferred: this is the only tenant key in REMP.
+The property `uuid` is the "property token" that the browser sends as `system.property_token`. The Tracker validates it against `SELECT * FROM properties WHERE uuid = ?` (`beam-go/model/property.go`, line 47). Pageview, commerce and custom event documents in Elasticsearch carry it as the field `token` (`beam-go/cmd/tracker/controller/track.go`, line 359). Entity documents are validated against it but do not store it (`track.go`, line 253). Impression documents neither validate nor store it: the `Impressions` payload has no `system` block (`design/user_types.go`, lines 192 to 200). Inferred: this is the only tenant key in REMP.
 
 #### Articles and taxonomy
 
@@ -118,7 +118,7 @@ The `utm_*` columns on the three event tables were renamed to `rtm_*` by `2020_1
 
 A conversion arrives through `beam-module/src/Http/Controllers/ConversionController.php` with `article_external_id`, `transaction_id`, `amount`, `currency`, `paid_at` and `user_id`. The upsert is idempotent on `transaction_id`. Inferred: `transaction_id` is the CRM payment reference and `user_id` is the CRM user id. The evidence is the Tracker's commerce payload, which describes `transaction_id` as "Public ID of transaction (variable symbol)" (a bank transfer reference), and `ProcessConversionSources`, which matches `conversions.transaction_id` against commerce events.
 
-The conversion event tables are the one place in Beam that stitches browsers to users. `beam-module/src/Console/Commands/AggregateConversionEvents.php` asks the Journal for all `browser_id` values that appeared on events carrying the conversion's `user_id` in the previous 14 days, then lists pageviews by those browsers. Nothing stores this mapping permanently.
+The conversion event tables are one of two places in Beam that pair browsers with users; `article_aggregated_views` also stores `user_id` and `browser_id` on the same row for 30 days (`AggregateArticlesViews.php`, lines 181, 246 and 316 to 317). `beam-module/src/Console/Commands/AggregateConversionEvents.php` asks the Journal for all `browser_id` values that appeared on events carrying the conversion's `user_id` in the previous 14 days, then lists pageviews by those browsers. No table keeps this mapping beyond those 30 days.
 
 #### Segments
 
@@ -241,9 +241,9 @@ Inferred: with no message key, ordering is only guaranteed within a partition, a
 
 Inferred from the config options: timespent and progress are not append only events. Each ping overwrites the `timespent` or progress fields of the single document keyed by `remp_pageview_id`, so Elasticsearch holds the latest cumulative value per pageview. And `concurrents_by_browser` holds one document per browser.
 
-Both producers emit the point with no tags and one `_json` field. Whether the plugin re-splits `_json` into tags and fields before applying `field_whitelist` cannot be confirmed without its source. The churn SQL joins `pageviews_time_spent.user_id`, and the Laravel jobs group timespent by `article_id`, `user_id` and `browser_id`, so those keys are present in the index in practice.
+Both producers emit the point with no tags and one `_json` field. Whether the plugin re-splits `_json` into tags and fields before applying `field_whitelist` cannot be confirmed without its source. The churn SQL joins `pageviews_time_spent.user_id`, and the Laravel jobs group timespent by `article_id`, `user_id` and `browser_id`, so those keys are present in the index in practice (inferred from those consumers working).
 
-Elasticsearch is version 8.6.1 in Docker (`remp-master/Docker/elasticsearch/Dockerfile`). Mappings are dynamic except that the Segments service pushes `subscriber` and `signed_in` as booleans on the three pageview indexes at start (`beam-go/cmd/segments/main.go`, lines 246 to 276). The Segments service expects string fields to have a `.keyword` subfield (Elasticsearch's default dynamic mapping for strings) and uses `user_id.keyword` and `browser_id.keyword` for exact filters and cardinality (`beam-go/model/db_elastic.go`, lines 657 to 677; `pageview_elastic.go`, lines 211 to 220).
+Elasticsearch is version 8.6.1 in Docker (`remp-master/Docker/elasticsearch/Dockerfile`). Mappings are dynamic except that the Segments service pushes `subscriber` and `signed_in` as booleans on the three pageview indexes at start (`beam-go/cmd/segments/main.go`, lines 246 to 276; an explicit `revenue` mapping for `commerce` is commented out at line 252). The Docker start script `remp-master/Docker/elasticsearch/create-indexes.sh` (line 5) tries to declare `revenue` as `double` on `commerce`, but it posts to `/commerce/_doc`, so it indexes a document rather than setting a mapping. For filters the Segments service checks the index mapping and uses the `.keyword` subfield when it exists, falling back to the plain field otherwise (`beam-go/model/db_elastic.go`, lines 657 to 677). The unique count queries hardcode `user_id.keyword` and `browser_id.keyword` (`pageview_elastic.go`, lines 211 to 220).
 
 REMP ships no automated Elasticsearch retention. There is no lifecycle policy or delete job under `remp-master/Docker/elasticsearch/` or in the Segments service. The Beam README section "Elasticsearch shards are getting too big" (`remp-master/Beam/README.md`, lines 657 to 782) tells operators to roll indexes over behind aliases and delete old ones by hand. The Laravel commands `service:elastic-write-alias-rollover` and `service:elastic-data-retention` exist for that (`beam-module/src/Console/Commands/ElasticDataRetention.php`) and are not in the scheduler. Inferred: the raw event history available at any site is whatever its operator kept.
 
@@ -301,7 +301,7 @@ Mailer uses MySQL through Nette Database, and Redis for Hermes (Mailer's interna
 | `mail_snippets`, `mail_snippet_translations` | `20210217101856_snippets.php`; `20220308090047` | Reusable fragments. |
 | `mail_templates` | `20170829092343_initial_migration.php` | One email. `code` UNIQUE (`20190213082954`), `public_code` UNIQUE 8 character value (`20210629105924`), `mail_type_id` FK, `mail_layout_id` FK, `extras` JSON, `params` JSON, `click_tracking`, `deleted_at`. |
 | `mail_template_translations` | `20220304112945` | Per locale subject and body. |
-| `mail_source_template` | `20180314235544_mail_source_template.php` | Generator templates, `code` UNIQUE. |
+| `mail_source_template` | `20180314235544_mail_source_template.php` | Generator templates, `code` UNIQUE (`20180726110436`). |
 | `mail_jobs` | `20170829092343_initial_migration.php` | A send. `segments` JSON with `include` and `exclude` lists of `{provider, code}` (`20230112144141`, which dropped `segment_code` and `segment_provider`), `mail_type_variant_id`, `status`, `context`. |
 | `mail_job_batch` | `20170829092343_initial_migration.php` | `mail_job_id` FK, `method`, `max_emails`, `start_at`, `status`, counters. Statuses are in `mailer-module/Repositories/BatchesRepository.php`, lines 20 to 29. |
 | `mail_job_batch_templates` | `20170829092343_initial_migration.php` | `mail_job_id`, `mail_job_batch_id`, `mail_template_id`, `weight`, and counters `sent`, `delivered`, `opened`, `clicked`, `dropped`, `spam_complained`, `hard_bounced` (`20171016121149`), `converted` (`20190130160455`). |
@@ -314,7 +314,7 @@ Mailer uses MySQL through Nette Database, and Redis for Hermes (Mailer's interna
 | `mail_user_subscriptions` | `20170829092343_initial_migration.php`, lines 133 to 142 | `user_id` integer, `user_email`, `mail_type_id` FK, `subscribed` boolean, `rtm_source`, `rtm_medium`, `rtm_campaign`, `rtm_content` (added as `utm_*` by `20171026095546`, renamed by `20201207111939_mail_user_subscription_rename_utm_to_rtm.php`), `created_at`, `updated_at`. `id` became BIGINT in `20221123090507`. No unique key on `(user_email, mail_type_id)` or `(user_id, mail_type_id)` in any migration. |
 | `mail_user_subscription_variants` | `20180124064156_mail_user_subscription_types.php` | `mail_user_subscription_id` FK, `mail_type_variant_id` FK, UNIQUE pair. |
 
-One row represents one decision per person per list. No row means no decision was recorded.
+One row represents one decision per person per list. Inferred: no row means no decision was recorded.
 
 Three write paths exist. `POST /api/v1/users/user-registered` creates a row for every non deleted list the email has no row for yet, subscribed when `mail_types.auto_subscribe` is set and explicitly unsubscribed otherwise (`mailer-module/Api/v1/Handlers/Users/UserRegisteredHandler.php`, lines 61 to 72). Subscribing stores the `rtm_*` of the request that caused it and emits the Hermes message `user-subscribed`. Unsubscribing flips the flag, overwrites the `rtm_*` columns, deletes variant rows and emits `user-unsubscribed` (`mailer-module/Repositories/UserSubscriptionsRepository.php`, lines 164 to 274).
 
@@ -377,7 +377,7 @@ Campaign's schema dump at `campaign-module/database/schema/mysql-schema.sql` lis
 
 Campaign has no visitor table, no impression or click table and no per user history. Per visitor state lives in the browser under the localStorage keys `campaigns` and `campaigns_session`, keyed by campaign `public_id`, with fields `bannerId`, `variantId`, `seen`, `count`, `closedAt`, `clickedAt` (`campaign-module/resources/assets/js/remplib.js`, lines 354 to 486). The variant a visitor saw is remembered there; no server side table holds it.
 
-At showtime the browser sends `version`, `userId`, `browserId`, `language`, `url`, `referer`, `sessionReferer`, `campaigns`, `campaignsSession`, `cache`, `userAgent`, `usingAdblock` and `pageviewAttributes` (lines 39 to 61), plus `debug` when the `#campaignDebug` hash is set. `browserId` is required and `userId` is optional (`campaign-module/src/Http/Showtime/Showtime.php`, lines 100 to 111). The subscriber flag is not sent and is never read in Campaign (a search for `userSubscribed`, `isUserSubscriber` and `subscriptionIds` under `campaign-module/src` and `resources` finds nothing). Inferred: subscription based targeting therefore goes through segments.
+At showtime the browser sends `version`, `userId`, `browserId`, `language`, `url`, `referer`, `sessionReferer`, `campaigns`, `campaignsSession`, `cache`, `userAgent`, `usingAdblock` and `pageviewAttributes` (lines 39 to 61), plus `debug` when the `#campaignDebug` hash is set and a debug key is configured (line 56). `browserId` is required and `userId` is optional (`campaign-module/src/Http/Showtime/Showtime.php`, lines 100 to 111). The subscriber flag is not sent and is never read in Campaign (a search for `userSubscribed`, `isUserSubscriber` and `subscriptionIds` under `campaign-module/src` and `resources` finds nothing). Inferred: subscription based targeting therefore goes through segments.
 
 Segment evaluation picks `checkUser` when `userId` is present and `checkBrowser` otherwise (lines 851 to 881). The Beam provider calls the Segments check endpoints live. The CRM provider (`campaign-module/src/Contracts/Crm/Segment.php`) checks a Redis set `provider|code`. `CacheSegmentJob` rebuilds that set from `user-segments/users`: a forced refresh every hour, plus an every minute run that only fills a missing cache. Both the set and its timestamp key expire after 24 hours (`campaign-module/src/Scheduler.php`, lines 37 to 45; `Jobs/CacheSegmentJob.php`, lines 45 to 76). The provider's `checkBrowser` always returns false with the comment "CRM segments don't support browser tracking" (lines 90 to 94).
 
@@ -393,7 +393,7 @@ remplib.tracker.trackEvent("banner", "show", null, null, {
 });
 ```
 
-Every link in a banner carries the same `rtm_*` parameters. `campaigns:aggregate-stats` runs every minute and pulls counts of `banner/show`, `banner/click` and `commerce` `payment` and `purchase` filtered by `rtm_variant` from the Journal into the hourly stats tables.
+Every link in a banner carries the same `rtm_*` parameters. `campaigns:aggregate-stats` runs every minute when a Beam Segments address is configured (`campaign-module/src/Scheduler.php`, lines 14 to 21) and pulls counts of `banner/show`, `banner/click` and `commerce` `payment` and `purchase` filtered by `rtm_variant` from the Journal into the hourly stats tables.
 
 ### 1.6 SSO and the CRM contract
 
@@ -401,7 +401,7 @@ Every link in a banner carries the same `rtm_*` parameters. `campaigns:aggregate
 
 SSO has three migrations. `2017_07_07_122646_users.php` creates `users` (`id`, `email` UNIQUE, `name`, timestamps) and `google_users` (`user_id` FK, `google_id`, `nickname`, `name`). `2017_11_29_102649_create_api_tokens_table.php` creates `api_tokens` (`name`, `token`, `active`, `deleted_at`). `2018_03_14_143051_last_logged_at.php` adds `users.last_logout_at`.
 
-The `users` here are REMP staff who log in with Google. The JWT carries `provider`, `id`, `name`, `email` and `scopes`, and `scopes` is always an empty array (`remp-master/Sso/app/Models/User.php`, lines 61 to 67). `api_tokens.token` is a UUID checked by `GET /api/auth/check-token`, which returns 200 for any existing token regardless of `active` (`remp-master/Sso/app/Http/Controllers/AuthController.php`, lines 145 to 153). No SSO table or route carries a reader id.
+The `users` here are the people who log in to REMP admin screens with Google (the only login provider implemented, `remp-master/Sso/app/Http/Controllers/Auth/GoogleController.php`); they are not readers. The JWT carries `provider`, `id`, `name`, `email` and `scopes`, and `scopes` is always an empty array (`remp-master/Sso/app/Models/User.php`, lines 61 to 67). `api_tokens.token` is a UUID checked by `GET /api/auth/check-token`, which returns 200 for any existing token regardless of `active` (`remp-master/Sso/app/Http/Controllers/AuthController.php`, lines 145 to 153). No SSO table or route carries a reader id.
 
 Beam and Campaign use `remp-master/Composer/laravel-sso`, which registers `jwt` (and an alias `jwtx`) guard drivers for staff and a `token` guard driver for API calls. The token guard's user object identifies itself by the token string (`src/Contracts/Token/User.php`, lines 30 to 33), so an `auth:api` route in Beam or Campaign is authenticated by the token, not by a person. Mailer embeds its own client under `mailer-module/Models/Sso/`.
 
@@ -486,7 +486,7 @@ The subscription feature rows (the "analytical base table") are built in PHP fro
 | `payment_items` | `payment_id`, `type` (`donation` or `product`), `amount` | lines 879 to 883 |
 | `recurrent_payments` | `user_id`, `created_at`, `updated_at`, `expires_at`, `charge_at`, `state`, `cycle` | lines 907 to 913, 933 to 938 |
 
-Payment status literals used are `paid`, `prepaid`, `authorized`, `family`, `upgrade` and `fail`. Recurrent payment states used are `user_stop`, `admin_stop` and `system_stop`.
+Payment status literals used are `paid`, `prepaid`, `authorized`, `family`, `upgrade` and `fail`. Recurrent payment states used are `user_stop` (a literal at line 911) and, through the CRM enum `RecurrentPaymentStateEnum` (`ChurnFeatureCalculator.php`, lines 187 to 191), `UserStop`, `AdminStop` and `SystemStop`. The string values `admin_stop` and `system_stop` are inferred from the comment at line 143.
 
 Columns written per row, in order (`RunChurnPipelineCommand.php`, lines 659 to 682 and 742 to 755):
 
@@ -540,7 +540,7 @@ The Beam columns map back to the Tracker payload as follows.
 
 The engagement SQL is a template, not fixed code. PHP substitutes `{{ACTIVE_TOKENS}}` (line 8), `{{TABLE_NAME}}` (lines 19, 75 and 90) and `{{DATASET}}` before running it. The file header says it must not be run directly (line 5). Its `CREATE TABLE IF NOT EXISTS` has to be kept in sync with the final `SELECT` by hand (line 26). `setEngagementFeaturesSqlPath()` points the pipeline at a publisher's own copy, and the README section 8 tells installers to extend it that way. Inferred: the feature set above is therefore per installation.
 
-Fields present in the Elasticsearch `pageviews` index but not used by the churn SQL: `browser_id`, `subscriber`, `subscription_ids`, `signed_in`, `remp_session_id`, `rtm_*`, `derived_referer_medium`, `locked`, `url`. The `pageviews_progress` index (`page_progress`, `article_progress`) is not read at all. Only signed in pageviews count.
+Fields present in the Elasticsearch `pageviews` index but not used by the churn SQL: `browser_id`, `subscriber`, `subscription_ids`, `signed_in`, `remp_session_id`, `rtm_*`, `derived_referer_medium`, `locked`, `url`. The `pageviews_progress` index (`page_progress`, `article_progress`) is not read at all. Only pageviews that carry a `user_id` count.
 
 ### 2.4 Observation points and label
 
@@ -557,7 +557,7 @@ Fields present in the Elasticsearch `pageviews` index but not used by the churn 
 
 The prediction script runs `ML.PREDICT` over `churn_scoring_all_features`, keeps `user_id`, `subscription_id`, `length_family`, `days_to_expiry` and `subscription_end_time` as pass through columns, and writes `churn_probability` as the probability of label 1 (`churn_predict.sql`, lines 30 to 46).
 
-`churn:download_churn_predictions` pulls the newest row per subscription among rows whose `prediction_date` is today or within the previous three days (`churn/src/Commands/DownloadChurnPredictionsCommand.php`, lines 55 to 63). It skips rows whose user or subscription no longer exists in the CRM. It upserts the CRM table `churn_predictions` by `subscription_id`, so that table holds only the latest score per subscription and the history stays in BigQuery.
+`churn:download_churn_predictions` pulls the newest row per subscription among rows whose `prediction_date` is today or within the previous three days (`churn/src/Commands/DownloadChurnPredictionsCommand.php`, lines 55 to 63). It skips rows whose user or subscription no longer exists in the CRM. It upserts the CRM table `churn_predictions` by `subscription_id`, so that table holds only the latest score per subscription (`ChurnPredictionsRepository::upsert`, lines 19 to 48) while BigQuery keeps one row per subscription per day.
 
 | CRM table | Created by | Columns |
 |---|---|---|
@@ -576,7 +576,7 @@ The README cron (`churn/README.md`, lines 216 to 228):
 | 05:30 | `churn:run_pipeline --mode=scoring --model=churn_xgboost` under `flock` |
 | 06:30 | `churn:download_churn_predictions` |
 
-Everything is day grained. `export_date` is `date('Y-m-d')` at run time (line 190) and is how the engagement script finds "this run's rows". Engagement rows are keyed by `DATE(observed_at)`. Predictions are partitioned by `prediction_date`. All scoring rows of one run share `observed_at = now`. Model retraining is manual (README line 234). The README says a missed training run is caught up for up to five days (line 233). That matches the arithmetic: the 33 day window minus the 28 day churn horizon leaves five days of overlap.
+Everything is day grained. `export_date` is `date('Y-m-d')` at run time (line 190) and is how the engagement script finds "this run's rows". Engagement rows are keyed by `DATE(observed_at)`. Predictions are partitioned by `prediction_date`. All scoring rows of one run share `observed_at = now`. Model retraining is manual (README line 234). The README says a missed training run is caught up for up to five days (line 233). Inferred: that matches the arithmetic, because the 33 day window minus the 28 day churn horizon leaves five days of overlap.
 
 The engagement windows end at `observed_date - 1 day`. Inferred: the 05:30 scoring run therefore depends on the 03:05 export of yesterday having completed. If the export is late or fails, the engagement features silently under count, because the join simply finds fewer rows and no freshness check exists.
 
@@ -625,7 +625,9 @@ The `@context` (lines 5 to 32) maps ADC names onto schema.org terms, with one Ac
 | `userAgent` | `instrument` |
 | `timeSpent` | `duration` |
 | `completionRate` | `value` |
-| `referrer` | `activitystream:origin` | The `entities` block defines exactly three entities. Each property uses a JSON Schema like vocabulary (`type`, `description`, `required: true`, `items`, `properties`, `minimum`, `maximum`, `pattern`, `format`) plus the ADC extension `enumFromTaxonomy`. The README warns that the definitions "must not be fed to a JSON Schema validator" (line 121).
+| `referrer` | `activitystream:origin` |
+
+The `entities` block defines exactly three entities. Each property uses a JSON Schema like vocabulary (`type`, `description`, `required: true`, `items`, `properties`, `minimum`, `maximum`, `pattern`, `format`) plus the ADC extension `enumFromTaxonomy`. The README warns that the definitions "must not be fed to a JSON Schema validator" (line 121).
 
 ### 3.2 person
 
@@ -698,7 +700,7 @@ Each taxonomy is a JSON array of `{notation, value}`. `value` appears in data; `
 | `EducationLevel-v1` (6) | `no_formal_education`, `primary_education`, `secondary_education`, `bachelors_degree`, `masters_degree`, `doctorate_degree` |
 | `IncomeBracket-v1` (7) | `very_low`, `low`, `lower_middle`, `middle`, `upper_middle`, `high`, `very_high` |
 
-The README table lists the fifth education value as `mains_degree` (line 156); the taxonomy file has `masters_degree`. The README says `value` is what appears in data (line 148) and that README tables must match the schema exactly (`adc/CONTRIBUTING.md`, line 37), so the file is the reference and the README has a typo.
+The README table lists the fifth education value as `mains_degree` (line 156); the taxonomy file has `masters_degree`. The README says `value` is what appears in data (line 148) and that README tables must match the schema exactly (`adc/CONTRIBUTING.md`, line 37), so the file governs and the README entry is a typo.
 
 ### 3.6 Validation and versioning
 
@@ -724,7 +726,7 @@ There are no example records anywhere in the repository.
 | Event vocabulary | `pageviews` with `load`, `timespent`, `progress`; `commerce` with `checkout`, `payment`, `purchase`, `refund`; free `category`/`action` pairs such as `banner/show`, `mail/sent`, `mail-type/subscribe` | 11 fixed `actionType` values |
 | Time | Client supplied `system.time` on pageview, commerce, event and entity payloads (impressions fall back to server time); aggregates in 20 minute buckets, compressed to daily after 90 days | One `published` timestamp per action; no ingestion time |
 | Tenant | `token` field on pageview, commerce and event messages (not on entity or impression messages) | `dataSource` free string on every record |
-| Consent | Per newsletter list and variant with rtm attribution | One `consentType` and `consentDate` per person |
+| Consent | Per newsletter list and variant with rtm attribution on the subscription row; the list carries a `locked` flag (`mail_types.locked`) | One `consentType` and `consentDate` per person |
 | Money | `revenue.amount` and `currency` on commerce events, `conversions.amount` | `donorStatus` with a prose $100 threshold, `donation_made` action |
 | Versioning | None in the message format; renames handled by dual reads (`utm_*` or `rtm_*`) | SemVer on the standard, nothing per record |
 
@@ -743,7 +745,7 @@ The mappings below name the REMP source and the ADC target. Where a transformati
 | `primaryEmail` | Mailer `mail_user_subscriptions.user_email`, `mail_logs.email` | Clear text in REMP. ADC has no hashing rule. |
 | `additionalEmails` | `POST /api/v1/users/email-changed` carries `original_email` and `new_email` but Mailer does not keep the old one | No source. |
 | `engagementScore` | none directly. Candidates: Beam `views_per_user_mv.total_views_last_30_days`, author or section segment membership, `churn_engagement_features` columns | ADC requires 1 to 5 with no definition. Any mapping is a publisher convention. Inferred: `churn_probability` is a different quantity (a 0 to 1 probability, not a 1 to 5 score), so mapping it here would change its meaning. |
-| `tags` | Mailer `mail_types.code` of lists where `subscribed = 1`; Beam `segments.code` for segments the user is in (`GET /segments/{code}/users`) | ADC's description names "MailChimp lists", which matches Mailer lists. Segment membership would need a prefix to avoid collision. |
+| `tags` | Mailer `mail_types.code` of lists where `subscribed = 1`; Beam `segments.code` for segments the user is in (`GET /segments/{segment_code}/users`, `beam-go/cmd/segments/design/resources.go`, line 151) | ADC's description names "MailChimp lists", which matches Mailer lists. Segment membership would need a prefix to avoid collision. |
 | `dataSource` | Beam `token` (property uuid), or a per publisher constant | Required. |
 | `consentDate` | Mailer `mail_user_subscriptions.created_at` or `updated_at` of a subscribed row | Mailer has one row per list; ADC has one date per person. A reducer (earliest or latest) is a convention. |
 | `consentType` | `mail_types.auto_subscribe` on registration maps to `implicit`; a row created through `users/subscribe` maps to `explicit`; rows created by `mail:sync-user-subscriptions` map to `imported` | Inferred mapping. Mailer does not record how a row was created, so this can only be derived at write time, not from the stored row. |
@@ -770,7 +772,7 @@ The mappings below name the REMP source and the ADC target. Where a transformati
 
 ### 4.3 action
 
-Each REMP event type maps to at most one `actionType`. The `person` field is the problem in every row: ADC requires it, and REMP events carry a `user_id` only when the page injected one.
+Each REMP event type maps to at most one `actionType`. The `person` field is the constraint in every row: ADC requires it, and REMP events carry a `user_id` only when the page injected one.
 
 | REMP event | `actionType` | `person` | `object` | `published` | `timeSpent` | `completionRate` | `referrer` | `deviceContext.userAgent` |
 |---|---|---|---|---|---|---|---|---|
@@ -838,7 +840,7 @@ Sources for each value:
 
 Only the `web_read` and the four `newsletter_*` action types have a REMP source. `app_read`, `form_submit`, `survey_complete`, `comment_post`, `donation_made` (except by convention for donation products) and `irl_event_attend` have none.
 
-A `web_read` action built from Beam collapses three Elasticsearch documents (load, timespent, progress) that share a `remp_pageview_id`. Because timespent and progress are overwritten in place, a batch mapping reads the final state. Inferred: a streaming mapping has to wait for the `unload: true` ping or emit updates. See section 6.
+A `web_read` action built from Beam collapses three Elasticsearch documents (load, timespent, progress) that share a `remp_pageview_id`. Because timespent and progress are overwritten in place, a batch mapping can only read the final state. Inferred: a streaming mapping has to wait for the `unload: true` ping or emit updates. See section 6.
 
 ### 4.4 What ADC is missing relative to REMP
 
@@ -868,7 +870,7 @@ A `web_read` action built from Beam collapses three Elasticsearch documents (loa
 
 | ADC concept | REMP status |
 |---|---|
-| Global person id across sources | None. Each component forwards the CRM id without checking it. Beam and Campaign carry it as a string while Mailer stores it as an integer. |
+| Global person id across sources | None. No component validates the CRM id against the CRM (see 1.7). Beam and Campaign carry it as a string while Mailer stores it as an integer. |
 | Names (`givenName`, `familyName`) | Not stored in any REMP table. |
 | Demographics (age group, gender, education, income) | Not stored. |
 | Location on the person | Not stored. Campaign resolves country per request and discards it. |
@@ -876,7 +878,7 @@ A `web_read` action built from Beam collapses three Elasticsearch documents (loa
 | Interests and commented topics | Not stored. Derivable from `article_aggregated_views` plus tags and sections for 30 days. |
 | Consent type and consent date as a person attribute | Mailer has per list rows with timestamps but no record of how consent was obtained. |
 | Surveys, survey responses, forms, comments, in person events | No tables or events. |
-| App reads | The Tracker has no app or platform field. `derived_ua_device` distinguishes device class only. |
+| App reads | The Tracker payload has no app or platform attribute. The Tracker derives `derived_ua_device`, `derived_ua_os` and `derived_ua_platform` from the user agent (`track.go`, lines 375 to 378), which distinguish device class and OS, not a native app. |
 | A controlled action vocabulary | Beam `events` accept any `category` and `action` string. |
 | A stable object URL | Beam keys articles by `external_id`; `url` is non unique and not used for joins. |
 | Time spent as a per action duration | Beam has it as a mutable cumulative field per pageview, and MySQL only as aggregates: `article_timespents.sum` per article per window, and `article_aggregated_views.timespent` per article, user or browser, and day. |
@@ -901,7 +903,7 @@ A `web_read` action built from Beam collapses three Elasticsearch documents (loa
 3. ADC has no event identity or envelope. Without an action id, a sequence or an ingestion time, deduplication and late arrival handling are not possible at the schema level. REMP already has `remp_pageview_id`, `remp_event_id`, `remp_commerce_id` and `transaction_id` for exactly this.
 4. ADC consent is a single person level pair. Mailer consent is per list, per variant, with the flag history overwritten on each flip and rtm attribution of the last change. Reducing that to one `consentType` and `consentDate` loses the per list state that drives sending.
 5. The validator does not validate data. A record with a wrong taxonomy value, a malformed date or a missing required property passes through unnoticed, because no tool in the repository checks records. An adopter that wants record checks would have to write them; nothing in the repository does.
-6. Identity is clear text email matching. `primaryEmail` and `additionalEmails` are described as the matching mechanism. REMP stores emails in Mailer. Beam can also receive them through `/track/entity`: the Beam seeder defines an entity `user` with params `id` and `email` (`remp-master/Beam/database/seeders/EntitySeeder.php`, lines 18 to 22). Entity documents land in the `entities` index without `token`, `user_id` or `browser_id`, so such emails have no provenance. Nothing in ADC specifies hashing, salting or pseudonymisation. Sharing such records between organisations would need a privacy layer that ADC does not define.
+6. Identity is clear text email matching. `primaryEmail` and `additionalEmails` are described as the matching mechanism. REMP stores emails in Mailer. Beam can also receive them through `/track/entity`: the Beam seeder defines an entity `user` with params `id` and `email` (`remp-master/Beam/database/seeders/EntitySeeder.php`, lines 18 to 36). Entity documents land in the `entities` index without `token`, `user_id` or `browser_id`, so such emails have no provenance. Nothing in ADC specifies hashing, salting or pseudonymisation. Sharing such records between organisations would need a privacy layer that ADC does not define.
 7. The `objectID` pattern requires a domain shaped string (a dotted host name with a two letter or longer top level domain, with optional scheme, port and path), and it rejects the "hashed uuid" its own description mentions. REMP keys articles by CMS `external_id`, and Beam's `articles.url` is neither unique nor stable. Newsletters and lists have no URL at all. Minting URLs is a convention the adopter must own.
 8. The 1.0.0 `@context` has known IRI collisions (`person` and `object` on `action` both map to `schema:identifier`), so JSON-LD processors cannot distinguish actor from object. The README lists these under "Known issues (to be addressed in 1.1)". Inferred: until then a linked data consumer cannot tell `person` from `object` on an action by IRI alone.
 9. `engagementScore` has no definition and a minimum of 1, so "no engagement" cannot be expressed as 0. Churn probability is a different quantity and should stay out of this field.
@@ -935,7 +937,7 @@ When Mailer is configured with `Tracker\Remp`, its `mail-type/subscribe`, `mail-
 
 Mailer opens and clicks would have to be forwarded from the Hermes `mailgun-event` handler to the Tracker as `events_v2` to become visible on the topic. Nothing does that today. `TrackNewsletterArticlesHandler` shows the pattern (it posts `newsletter` events per article link) but is not registered in any shipped configuration.
 
-Mailer events are stamped with the time the Hermes message was emitted: `new DateTime()` at the subscription flip (`UserSubscriptionsRepository.php`, lines 417 and 432) and `time()` in `MailWorkerCommand.php` (line 294) for `mail/sent`. The Hermes handler that posts them to the Tracker reuses that payload time. Beam `pageviews` are stamped with the browser clock.
+Mailer subscription events are stamped with the time the Hermes message was emitted: `new DateTime()` at the subscription flip (`UserSubscriptionsRepository.php`, lines 417 and 432), and `TrackSubscribeUnsubscribeHandler` reuses that payload time. `mail/sent` is stamped with `time()` when `MailWorkerCommand.php` (line 294) dispatches `MailSentEvent` through the event dispatcher. Beam `pageviews` are stamped with the browser clock.
 
 ### 6.3 Identity resolution
 
@@ -944,7 +946,7 @@ The stream carries up to four subject keys on each message: `browser_id` (always
 What exists today:
 
 1. The Tracker records both ids when both are present (`track.go`, lines 481 to 489). The link exists per message, never as a table.
-2. `AggregateConversionEvents` rebuilds a browser to user map per conversion by querying all `browser_id` values on events carrying that `user_id` in the 14 days before the conversion's `paid_at` (`DAYS_IN_PAST = 14`, `AggregateConversionEvents.php`, lines 23 and 72 to 79). It runs daily at 03:30 and per conversion through the queue.
+2. `AggregateConversionEvents` rebuilds a browser to user map per conversion by querying all `browser_id` values on events carrying that `user_id` in the 14 days before the conversion's `paid_at` (`DAYS_IN_PAST = 14`, `AggregateConversionEvents.php`, lines 23 and 73 to 81). It runs daily at 03:30 and per conversion through the queue.
 3. `ProcessPageviewLoyalVisitors` groups by `user_id, browser_id` and maps browsers to users when both tags are present on the same day. It is a manual command: `BeamServiceProvider.php` (line 214) registers it, `Scheduler.php` does not run it, and nothing else calls it.
 4. The Segments service, Campaign showtime and the churn module never link the two.
 
@@ -959,7 +961,7 @@ Inferred design for a stream:
 
 Kafka ordering is per partition. The Tracker sets no message key, and the Pub/Sub producer sets no `OrderingKey` (`pubsub_event_producer.go`, lines 48 to 50). Inferred: once `beam_events` has more than one partition, messages from one browser can be consumed out of order. Three REMP facts make ordering matter:
 
-1. Timespent and progress are cumulative overwrites keyed by `remp_pageview_id`. An out of order `timespent` ping would regress the stored value. A consumer should keep the maximum per `remp_pageview_id`, or key the topic by `remp_pageview_id` or `browser_id` at the producer.
+1. Timespent and progress are cumulative overwrites keyed by `remp_pageview_id`. Inferred: an out of order `timespent` ping would regress the stored value. A consumer should keep the maximum per `remp_pageview_id`, or key the topic by `remp_pageview_id` or `browser_id` at the producer.
 2. Commerce steps form a funnel (`checkout`, `payment`, `purchase`, `refund`) linked by `commerce_session_id`. Inferred: the `purchase` message can arrive before `checkout` if they land on different partitions.
 3. Mailer subscribe and unsubscribe events for one user and one list are state flips. Applying them out of order yields the wrong consent state. Mailer's own table overwrites with the latest write. Inferred: that is safe only because the writes come from one application.
 
@@ -970,7 +972,7 @@ Inferred: setting the Kafka message key to `browser_id` for browser originated e
 Three sources of lateness exist in REMP today:
 
 1. The event time is the client clock (`system.time` parsed as RFC 3339). Skewed clocks move events across day boundaries. The churn SQL buckets by `DATE(pv.time)`, so a skewed clock changes which observation window a pageview falls into.
-2. The last timespent and progress pings are sent on `beforeunload` over XMLHttpRequest and can be lost or arrive after the pageview's day has closed.
+2. The last timespent and progress pings are sent on `beforeunload` over XMLHttpRequest. Inferred: they can be lost or arrive after the pageview's day has closed.
 3. Mailgun events are polled with an intentional 60 second delay in the polling mode (`MailgunEventsCommand.php`, line 23). Inferred: opens and clicks can arrive hours or days after the send, because they depend on when the recipient acts.
 
 Inferred: the batch pipeline hides this because it runs the next morning and Elasticsearch documents are overwritten in place. A stream consumer needs three things. A watermark per `token` or per subject (the event time below which it assumes no more events will arrive). An allowed lateness window. A rule for events that arrive after a feature window was emitted. ADC has no field for ingestion time or lateness, so those fields would have to travel in an envelope outside the ADC record.
@@ -1002,7 +1004,7 @@ Constraints that do not change with streaming:
 
 1. The model only sees signed in pageviews joined by `user_id`. Streaming does not add anonymous traffic unless the identity link table from 6.3 is built and the engagement SQL is changed to use it.
 2. `export_date` is the handle the engagement script uses to find today's rows. A streaming version needs a different handle, such as a run id, because `export_date` is the wall clock date and cannot distinguish two runs on one day. The `--now-date` option already lets the subscription export be rerun for a past instant, so a stream fed engagement table only needs the same `observed_at` handle.
-3. Training rows depend on the full 90 day pageview history before each historical observation date still being present. A stream sink must retain at least that much. Because REMP has no Elasticsearch retention policy, the history available to a backfill today is whatever the operator kept. The training label still needs 28 days to elapse after `end_time`, so training stays batch by definition.
+3. Training rows depend on the full 90 day pageview history before each historical observation date still being present. A stream sink must retain at least that much. Because REMP has no automated Elasticsearch retention (the manual `service:elastic-data-retention` command exists but is not scheduled), the history available to a backfill today is whatever the operator kept. The training label still needs 28 days to elapse after `end_time`, so training stays batch by definition.
 4. Feature values must stay as of `observed_at`. Retroactive identity attribution (6.3) would change historical features and must be versioned or excluded from training.
 5. The timezone split between CRM MySQL dates and BigQuery `DATE()` on UTC timestamps (section 2.6) becomes more visible when windows are computed continuously. The stream should carry one canonical timezone.
 
