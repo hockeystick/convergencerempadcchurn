@@ -18,7 +18,7 @@ Everything stated as fact was checked in the code in this repository. Statements
 
 The REMP CRM application itself is not present. `remp-master/` holds the application folders `Beam`, `Campaign`, `Composer`, `Docker`, `Mailer`, `Package` and `Sso`, a `changelogs/` folder, and top level files (README, CHANGELOG, Makefile, docker-compose files and install scripts). No `Crm\` namespace exists under `remp-master`. The only `Crm\` namespace in the repository is `Crm\ChurnPredictionModule` inside the churn module (`crm-churn-prediction-module-master/src/Models/BigQueryConfig.php`, line 3).
 
-As a result, the CRM tables named in this document (`users`, `subscriptions`, `payments`, `recurrent_payments` and so on) are inferred from the SQL the churn module runs against them. They are marked as inferred wherever they appear.
+To close that gap, the CRM was read from its public source: the `remp2020/crm-skeleton` repository and the nineteen `remp2020/crm-*-module` repositories it requires, cloned read only on 2026-11-07 at their latest commits (dated 2026-11-06). Section 1.8 describes their schema. CRM tables named elsewhere in this document are therefore verified against those migrations, and citations into them carry the repository name first, for example `crm-users-module/src/migrations/...`. Two REMP facing CRM packages are not in that set and were not read: `crm-remp-campaign-module` and whatever module bridges CRM commerce events to the Beam Tracker.
 
 The `beam-bigquery-export` tool that loads Beam events into BigQuery is also not in the repository. It is referenced only in the churn module README (`crm-churn-prediction-module-master/README.md`, lines 27, 217 and 218). A case-insensitive search for `bigquery` across `remp-master/` and `adc-schema-main/` returns nothing.
 
@@ -32,6 +32,7 @@ The `beam-bigquery-export` tool that loads Beam events into BigQuery is also not
 | `campaign-module/` | `remp-master/Campaign/extensions/campaign-module/` |
 | `churn/` | `crm-churn-prediction-module-master/` |
 | `adc/` | `adc-schema-main/` |
+| `crm-<name>-module/` | the `remp2020/crm-<name>-module` repository, cloned outside this repository (see 0.2) |
 
 Beam migrations live in `beam-module/database/migrations/` (78 files) plus one in `remp-master/Beam/database/migrations/`. Mailer migrations live in `mailer-module/migrations/` (86 files for Phinx, the PHP migration tool Mailer uses). Campaign migrations live in `campaign-module/database/migrations/` (69 files). SSO has three migrations in `remp-master/Sso/database/migrations/`. The churn module has one migration in `churn/src/migrations/`.
 
@@ -50,7 +51,7 @@ REMP is four applications with separate databases and no shared user table.
 | Mailer (Nette) | MySQL plus Redis | Newsletter lists, per-list consent, templates, jobs, send logs |
 | Campaign (Laravel) | MySQL plus Redis | Campaigns, banners, variants, schedules, hourly stats |
 | Sso (Laravel) | MySQL plus Redis | Staff logins and machine API tokens |
-| CRM (not in repo) | MySQL (inferred) | Users, subscriptions, payments |
+| CRM (separate repositories, section 1.8) | MySQL plus Redis | Users, addresses, subscriptions, payments, recurring payments, segments, scenarios, sales funnels, shop orders |
 
 No component stores a central reader record. The publisher's page sets the CRM user id in the browser library, which forwards it unchanged. Beam stores it as a string column and Mailer as an integer column. Section 1.7 covers this in detail.
 
@@ -407,17 +408,17 @@ Beam and Campaign use `remp-master/Composer/laravel-sso`, which registers `jwt` 
 
 #### CRM endpoints referenced in REMP
 
-The CRM is not in the repository. These are the endpoints REMP calls on it.
+These are the endpoints REMP calls on the CRM. Each was confirmed to exist in the CRM module repositories (section 1.8).
 
-| Method and path | Caller | Purpose |
-|---|---|---|
-| `POST api/v1/users/list` | Mailer `Models/Users/Crm.php` | Resolve user ids to `{id, email}` |
-| `GET api/v1/user-segments/list` | Mailer `Models/Segment/Crm.php` | List CRM segments |
-| `GET api/v1/user-segments/users?code=` | Mailer `Models/Segment/Crm.php` | User ids in a segment |
-| `GET user-segments/list`, `GET user-segments/users?code=` | Campaign `Contracts/Crm/Segment.php` | Same, base URL from `CRM_SEGMENT_API_ADDR` without the `api/v1` prefix |
-| `POST api/v1/users/set-email-validated`, `POST api/v2/users/set-email-validated` | Mailer `Models/Crm/Client.php` | Mark an address as having received mail |
-| `GET api/v1/users/touch?id=` | Mailer `Models/Crm/Client.php` | Ask the CRM to refresh cached user data after a subscription change |
-| `POST /api/v1/users/login`, `GET /api/v1/user/info`, `GET api/v1/token/check` | Mailer `Models/Auth/` | Admin login and token validation against the CRM |
+| Method and path | Caller | Purpose | CRM side |
+|---|---|---|---|
+| `POST api/v1/users/list` | Mailer `Models/Users/Crm.php` | Resolve user ids to `{id, email}` | `crm-users-module/src/UsersModule.php`, line 468; API token; pages of 1000; never returns anonymised users; `with_uuid` adds `uuid` |
+| `GET api/v1/user-segments/list` | Mailer `Models/Segment/Crm.php` | List CRM segments | `crm-segment-module/src/SegmentModule.php`, lines 77 to 79; only segments on the `users` table |
+| `GET api/v1/user-segments/users?code=` | Mailer `Models/Segment/Crm.php` | User ids in a segment | `SegmentModule.php`, lines 85 to 87; streams `{id, email}` with the id cast to a string |
+| `GET user-segments/list`, `GET user-segments/users?code=` | Campaign `Contracts/Crm/Segment.php` | Same, base URL from `CRM_SEGMENT_API_ADDR` without the `api/v1` prefix | same handlers; `user-segments/check` also exists (lines 93 to 95) and accepts `resolver_type` `id` or `email` |
+| `POST api/v1/users/set-email-validated`, `POST api/v2/users/set-email-validated` | Mailer `Models/Crm/Client.php` | Mark an address as having received mail | `UsersModule.php`, lines 514 to 537; writes `users.email_validated_at` |
+| `GET api/v1/users/touch?id=` | Mailer `Models/Crm/Client.php` | Ask the CRM to refresh cached user data after a subscription change | `UsersModule.php`, lines 542 to 544; regenerates the Redis user data for all of the user's access tokens |
+| `POST /api/v1/users/login`, `GET /api/v1/user/info`, `GET api/v1/token/check` | Mailer `Models/Auth/` | Admin login and token validation against the CRM | `UsersModule.php`, lines 426 and 429; `crm-api-module/src/ApiModule.php`, line 64 |
 
 No code in REMP reads subscription or payment data from the CRM; a search for CRM API paths finds only the endpoints listed above. REMP receives the `subscriber` and `subscription_ids` flags from the page, and commerce events through the Tracker. The Beam README (`remp-master/Beam/README.md`, lines 163 to 178) recommends calling `/track/commerce` from the CRM at checkout, payment, purchase and refund.
 
@@ -431,16 +432,16 @@ Inferred: these are the CRM's responsibilities, because the READMEs say so and n
 
 ### 1.7 How users, articles, subscriptions, payments and events are identified and linked
 
-| Thing | Beam | Mailer | Campaign | CRM (inferred) |
+| Thing | Beam | Mailer | Campaign | CRM (section 1.8) |
 |---|---|---|---|---|
-| Logged in reader | `user_id` string tag on events; `conversions.user_id`, `segment_users.user_id`, `article_aggregated_views.user_id`, all `varchar(191)` with no FK | `user_id` integer plus `user_email` | `userId` string in the showtime request, not persisted by showtime itself (Campaign holds user ids only in Redis: CRM segment member sets and one time banner keys) | `users.id` integer |
-| Anonymous reader | `browser_id` UUIDv4 from the browser, 2 year storage; `segment_browsers.browser_id`, `article_aggregated_views.browser_id` | not present | `browserId`, required at showtime | not present |
+| Logged in reader | `user_id` string tag on events; `conversions.user_id`, `segment_users.user_id`, `article_aggregated_views.user_id`, all `varchar(191)` with no FK | `user_id` integer plus `user_email` | `userId` string in the showtime request, not persisted by showtime itself (Campaign holds user ids only in Redis: CRM segment member sets and one time banner keys) | `users.id` `int(11)`, `users.email` UNIQUE, `users.uuid` UNIQUE (2024), deprecated HMAC `hashed_id` |
+| Anonymous reader | `browser_id` UUIDv4 from the browser, 2 year storage; `segment_browsers.browser_id`, `article_aggregated_views.browser_id` | not present | `browserId`, required at showtime | no column; `device_tokens.device_id` for mobile apps, and a `browser_id` cookie forwarded in the `login-attempt` Hermes message but never stored |
 | Session | `remp_session_id`, 15 minute sliding, Elasticsearch only | not present | `campaigns_session` client storage | not present |
 | Pageview | `remp_pageview_id`, Elasticsearch document id | not present | not present | not present |
 | Article | `articles.external_id` (CMS id), `article_id` tag on events; `url` is display only | numeric first path segment of links, in one optional handler | not present | not present |
-| Subscription state | `subscriber` boolean and `subscription_ids` array on each event, not stored in MySQL | `mail_user_subscriptions.subscribed` per list | not present | `subscriptions` rows (`is_paid`, `start_time`, `end_time`, `length`, `is_recurrent`) |
-| Payment | `commerce` events with `transaction_id`, `revenue.amount`, `revenue.currency`, `product_ids`, `funnel_id`; `conversions.transaction_id` UNIQUE | `mail_log_conversions` via Beam commerce events | `payment_count`, `purchase_count` per variant from Beam | `payments` rows with `amount`, `status`, `payment_gateway_id`; `recurrent_payments` |
-| Newsletter consent | `mail-type` events from Mailer | `mail_user_subscriptions` plus variants | not present | not present |
+| Subscription state | `subscriber` boolean and `subscription_ids` array on each event, not stored in MySQL | `mail_user_subscriptions.subscribed` per list | not present | `subscriptions` rows (`is_paid`, `start_time`, `end_time`, `length` in days, `is_recurrent`, `type`, `next_subscription_id`, `internal_status`); active means `start_time <= now < end_time`; cancellation shortens `end_time` |
+| Payment | `commerce` events with `transaction_id`, `revenue.amount`, `revenue.currency`, `product_ids`, `funnel_id`; `conversions.transaction_id` UNIQUE | `mail_log_conversions` via Beam commerce events | `payment_count`, `purchase_count` per variant from Beam | `payments` (`variable_symbol`, `amount` decimal, `status`, `paid_at`, `payment_gateway_id`, `subscription_id`, `ip`, `user_agent`, `rtm_*` in `payment_meta`), `payment_items` (`type`, `amount`, `vat`), `recurrent_payments` (`state`, `charge_at`, `chain_id`, `cycle`); no currency column |
+| Newsletter consent | `mail-type` events from Mailer | `mail_user_subscriptions` plus variants | not present | no table; the CRM calls Mailer and caches subscribed list codes in Redis |
 | Campaign exposure | `banner` events with `rtm_campaign`, `rtm_content`, `rtm_variant` | not present | hourly counts; client side `seen`, `closedAt`, `clickedAt` | not present |
 | Tenant | `properties.uuid` = event `token` | not present | not present | not present |
 
@@ -449,6 +450,109 @@ Three facts about identity hold across the whole stack:
 1. The CRM user id has no single type. Mailer validates and stores it as an integer. The Tracker (`beam-go/cmd/tracker/design/user_types.go`, line 8) and Campaign showtime (`Showtime.php`, lines 100 to 103) accept any string without validation. The Segments API restricts ids to `^[a-zA-Z0-9_\-@.]+$` (`beam-go/cmd/segments/design/resources.go`, line 10). The Journal PHP client casts every filter value to string. Inferred: in a REMP CRM deployment the id is the CRM `users.id` integer rendered as a decimal string on the Beam side.
 2. Nothing in the code read for this document verifies that a `user_id` seen in the Tracker exists in the CRM. The value is trusted as sent by the page.
 3. Nothing links `browser_id` histories to a `user_id` permanently. The Tracker records both when both are present. `AggregateConversionEvents` (scheduled) and `ProcessPageviewLoyalVisitors` (a manual command, not scheduled) rebuild the link by co-occurrence for one purpose each, and the Segments service evaluates the two separately.
+
+### 1.8 CRM schema (from the remp2020 CRM module repositories)
+
+The CRM is not in this repository. For completeness it was read from the public `remp2020` module repositories, cloned read only on 2026-11-07 at their latest commits (dated 2026-11-06): `crm-skeleton` plus the nineteen `crm-*-module` packages it requires. Paths in this section are repository relative with the repository name first, for example `crm-users-module/src/migrations/...`. Two REMP facing packages are not among them and were not read: the `crm-remp-campaign-module` that the onboarding README refers to, and whatever module forwards CRM commerce events to the Beam Tracker (see "What the CRM does not contain" below).
+
+#### Modules and their tables
+
+| Module | Tables (creating migration in `src/migrations/` of that module) |
+|---|---|
+| `crm-users-module` | `users`, `user_meta`, `user_actions_log`, `access_tokens`, `login_attempts`, `registration_attempts`, `groups`, `user_groups`, `addresses`, `address_types`, `countries`, `address_change_requests`, `addresses_meta`, `autologin_tokens`, `password_reset_tokens`, `user_email_confirmations`, `device_tokens`, `change_passwords_logs`, `user_connected_accounts`, `user_stats`, `admin_access`, `admin_groups`, `admin_groups_access`, `admin_user_groups` (most in `20180831074542_users_module_init_migration.php`) |
+| `crm-api-module` | `api_tokens`, `api_access`, `api_access_tokens`, `api_logs`, `api_token_stats`, `user_source_accesses`, `idempotent_keys`, `api_token_meta` |
+| `crm-subscriptions-module` | `subscriptions`, `subscription_types`, `subscription_type_names`, `subscription_extension_methods`, `subscription_length_methods`, `content_access`, `subscription_type_content_access`, `subscription_type_items`, `subscription_type_item_meta`, `subscription_types_meta`, `subscriptions_meta`, `subscription_type_tags`, `subscription_gaps` (`20180831074642_subscriptions_module_init_migration.php` and later) |
+| `crm-payments-module` | `payments`, `payment_items`, `payment_item_meta`, `payment_meta`, `payment_gateways`, `payment_gateway_meta`, `payment_logs`, `recurrent_payments`, `payment_methods`, `payment_cards`, `parsed_mail_logs`, `variable_symbols`, `retention_analysis_jobs`, `vat_rates`, `subscription_pauses` (`20190418061253_payments_module_init_migration.php` and later) |
+| `crm-upgrades-module` | `upgrade_schemas`, `upgrade_options`, `subscription_type_upgrade_schemas`, `subscription_upgrades`; adds `payments.upgrade_type` |
+| `crm-gifts-module` | `payment_gift_coupons` |
+| `crm-products-module` | `products`, `product_templates`, `product_template_properties`, `product_properties`, `product_bundles`, `product_tags`, `tags`, `orders`, `postal_fees`, `country_postal_fees`, `country_postal_fee_conditions`, `distribution_centers`; adds `payment_items.product_id` and `payment_items.postal_fee_id` |
+| `crm-salesfunnel-module` | `sales_funnels`, `sales_funnels_meta`, `sales_funnels_payment_gateways`, `sales_funnels_stats`, `sales_funnels_subscription_types`, `sales_funnels_conversion_distributions`, `sales_funnel_tags`; adds `payments.sales_funnel_id` |
+| `crm-invoices-module` | `invoices`, `invoice_numbers`, `invoice_items`, `vat_id_consultations`; adds `payments.invoice_id`, `payments.invoice_number_id` |
+| `crm-stripe-module` | `stripe_checkout_sessions` |
+| `crm-segment-module` | `segments`, `segment_groups`, `segments_values` |
+| `crm-scenarios-module` | `scenarios`, `scenarios_triggers`, `scenarios_elements`, `scenarios_trigger_elements`, `scenarios_element_elements`, `scenarios_jobs`, `scenarios_job_history`, `scenarios_element_stats`, `scenarios_trigger_stats`, `scenarios_generated_events`, `scenarios_selected_variants`, `scenarios_repeating_trigger_schedule`, `scenarios_versions` |
+| `crm-application-module` | `configs`, `config_categories`, `hermes_tasks`, `audit_logs`, `cache`, `calendar`, `measurements` and four related tables |
+| `crm-onboarding-module` | `onboarding_goals`, `user_onboarding_goals` |
+| `crm-print-module` | `print_subscriptions`, `print_claims`, `address_redirects` |
+| `crm-issues-module` | `magazines`, `issues`, `issue_pages`, `issue_source_files`, `subscription_type_magazines` |
+| `crm-admin-module` | `snippets` |
+| `crm-remp-mailer-module`, `crm-dashboard-module` | no tables |
+
+#### Users
+
+`users` is created by `crm-users-module/src/migrations/20180831074542_users_module_init_migration.php` (lines 15 to 51). `id` is `int(11) AUTO_INCREMENT`. `email` is `varchar(255) NOT NULL` with a UNIQUE key. Other columns as of the latest migration: `first_name`, `last_name`, `public_name` (NOT NULL, defaults to the email), `password`, `ext_id` (an id in an external system, indexed), `uuid` (UUIDv4, UNIQUE, added by `20240222134455_add_uuid_into_users_table.php`), `role` (`user` or `admin`), `active`, `confirmed_at`, `email_validated_at` (added 2021), `current_sign_in_at`, `current_sign_in_ip`, `created_at`, `updated_at`, `invoice`, `note`, `locale`, `is_institution`, `institution_name`, `supporter`, `source` (`varchar(255) NOT NULL DEFAULT 'unknown'`, indexed), `registration_channel` (default `crm`, added 2021), `sales_funnel_id`, `referer` (varchar 2000), `disable_auto_invoice`, `deleted_at`. The columns `address` and `phone_number` were moved out to `user_meta` in 2020 and `last_sign_in_at` and `last_sign_in_ip` were dropped in 2024.
+
+A deterministic `hashed_id` (`hash_hmac('sha256', users.id, CRM_KEY)`) exists in `crm-users-module/src/Models/Auth/UserManager.php` (lines 264 to 276) and is marked deprecated in favour of `uuid`.
+
+Values of `users.source` fixed by the module are `unknown`, `api`, `signup-form`, `google_sso`, `apple_sso`, plus `funnel` (sales funnels), `shop` (products) and `gift_coupon` (gifts); any API caller can set another string. `registration_channel` values set by the module are `crm`, `google` and `apple`.
+
+Related tables: `user_meta` (`user_id`, `key`, `value`, `is_public`, UNIQUE on user and key; only `is_public = 1` rows are exported to the API), `addresses` (`user_id`, `type`, `first_name`, `last_name`, `street`, `number`, `city`, `zip`, `country_id` to `countries.iso_code`, `company_*`, `phone_number`, `is_default`, `deleted_at`), `login_attempts` (`user_id`, `email`, `status` with 16 literals, `source`, `ip`, `user_agent`, `browser`, `browser_version`, `os`, `device`, `is_mobile`), `access_tokens` (one per sign in, `token`, `ip`, `user_agent`, `last_used_at`, `device_token_id`), `device_tokens` (`device_id`, `token`, for mobile apps), `user_connected_accounts` (`type` in `google_sign_in`, `apple_sign_in`, `external_id`, `email`), `user_groups`, `user_actions_log` (`action`, `params` JSON, kept 12 months), `user_stats` (`key`, `value` per user, written by other modules), `user_source_accesses` (`user_id`, `source`, `last_accessed_at`).
+
+Events emitted by the users module and consumed by other modules: Hermes `user-registered`, `email-changed`, `user-confirmed`, `login-attempt`, `address-changed`, `new-address`. The `login-attempt` payload carries a `browser_id` read from a cookie of that name (`crm-application-module/src/Models/Authenticator/BaseAuthenticator.php`, lines 86 to 95). Inferred: that cookie is the Beam `browser_id` when CRM and site share a cookie domain. It is forwarded in the message and never stored in a CRM table.
+
+GDPR deletion is anonymisation, not removal. `BasicUserDataProvider` overwrites `email` with `GDPR_removal@<timestamp>`, sets names and other personal columns to `GDPR Removal`, sets `active = 0` and `deleted_at`, and deletes login attempts, tokens, groups, stats and public meta (`crm-users-module/src/DataProviders/BasicUserDataProvider.php`, lines 92 to 116). `uuid`, `source`, `registration_channel` and `created_at` are left untouched. `POST /api/v1/users/list` never returns anonymised users. The churn module's `JOIN users` does not filter `deleted_at`, so anonymised users still appear in its rows (inferred from the two code paths).
+
+#### Subscriptions
+
+`subscriptions` is created by `crm-subscriptions-module/src/migrations/20180831074642_subscriptions_module_init_migration.php` (lines 91 to 121). Columns: `id`, `user_id` (`int(11) NOT NULL`, FK to `users.id`), `subscription_type_id` (FK), `is_recurrent`, `is_paid` (nullable boolean added by `20200430113327_add_column_is_paid_to_subscriptions.php` and backfilled from `type`), `start_time`, `end_time`, `type` (FK to `subscription_type_names.type`; seeded `regular`, `free`, `donation`, `gift`, `prepaid`, `upgrade`, `special`), `length` (integer days since `20200518073127_fixing_subscription_length_type.php`), `created_at`, `updated_at`, `next_subscription_id` (self FK), `internal_status` (`unknown`, `before_start`, `active`, `after_end`, a cache refreshed by `subscriptions:change_status`), `note`, `address_id`.
+
+Active is always computed as `start_time <= now AND end_time > now` (`SubscriptionsRepository.php`, lines 386 to 393). Cancellation is modelled by shortening `end_time`, possibly to `start_time`, with a note and the meta key `expired_by_admin`; there is no status column for it. Renewal is a chain through `next_subscription_id`, set when a new subscription starts exactly at the previous `end_time`. Upgrades are rows in `subscription_upgrades` (`base_subscription_id`, `upgraded_subscription_id`, `type` in `paid_recurrent`, `free_recurrent`, `paid_extend`, `short`, `trial`) plus a new subscription with `type = 'upgrade'`. Gaps longer than 28 days are precomputed into `subscription_gaps` (2026).
+
+`subscription_types` holds `code` (UNIQUE), `price` (decimal 10,2), `length` (days), `extension_method_id`, `length_method_id`, `next_subscription_type_id`, `trial_periods`, `default`, `no_subscription`, `limit_per_user`, `recurrent_charge_before` and legacy access flags. Content access is a property of the type: `subscription_type_content_access` links types to `content_access` rows (seeded `web`, `print`, `mobile`). `subscription_type_tags` (2023) holds free text tags with a unique pair index. Nothing in the CRM defines a `trial` tag; the churn module's reliance on `tag = 'trial'` is a publisher convention (inferred). The system level trial mechanism is `subscription_types.trial_periods` with `next_subscription_type_id`, and the upgrades module's `TrialUpgrade`.
+
+Events: League `NewSubscriptionEvent`, `SubscriptionUpdatedEvent`, `SubscriptionStartsEvent`, `SubscriptionEndsEvent`, `AfterLastSubscriptionEndedEvent`; Hermes `new-subscription`, `update-subscription`, `subscription-starts`, `subscription-ends`. The time driven start and end events fire from the cron command `subscriptions:change_status`.
+
+There is no `subscriber` boolean in the CRM. The nearest source for Beam's `user.subscriber` is the per access token user data blob, which carries the user's subscriptions with `end_time > now` as `id`, `start_time`, `end_time`, `code`, `is_recurrent`, `types` (`crm-subscriptions-module/src/DataProviders/SubscriptionsUserDataProvider.php`, lines 36 to 63). It is refreshed on new and updated subscription events but not on the time driven `subscription-ends` event (inferred staleness).
+
+#### Payments
+
+`payments` is created by `crm-payments-module/src/migrations/20190418061253_payments_module_init_migration.php` (lines 28 to 66). Columns: `id`, `variable_symbol` (`varchar(255) NOT NULL`, indexed, not unique), `amount` (decimal 10,2), `additional_amount`, `additional_type`, `payment_gateway_id` (FK), `subscription_id` (FK, nullable), `subscription_type_id` (FK, nullable), `user_id` (`int(11) NOT NULL`, FK to `users.id`), `status` (`varchar(255) NOT NULL DEFAULT 'form'`), `created_at`, `updated_at`, `error_message`, `referer` (varchar 2000), `paid_at`, `note`, `ip`, `user_agent`, `subscription_start_at`, `subscription_end_at`, `address_id`, `recurrent_charge`, plus `sales_funnel_id`, `upgrade_type`, `invoice_id`, `invoice_number_id`, `payment_country_id` and `payment_country_resolution_reason` added by other modules and later migrations.
+
+`PaymentStatusEnum` has exactly eight cases: `form`, `paid`, `fail`, `timeout`, `refund`, `imported`, `prepaid`, `authorized` (`crm-payments-module/src/Models/Payment/PaymentStatusEnum.php`, lines 11 to 18). The literals `family` and `upgrade` that the churn module uses as payment statuses (`RunChurnPipelineCommand.php`, line 858) do not exist in any cloned module. Inferred: `family` comes from a family module that was not cloned, and `upgrade` is legacy or installation specific.
+
+`variable_symbol` is a random 10 digit numeric string generated per payment and reserved in `variable_symbols` (`crm-payments-module/src/Repositories/VariableSymbolRepository.php`, lines 13 to 45). It is the bank transfer reference, the PayPal invoice field, and the value the upgrades module sends as `transaction_id` in its commerce shaped events. This confirms the earlier inference that Beam's `conversions.transaction_id` is the CRM variable symbol, with the caveat that a copied payment can reuse one.
+
+There is no currency column on `payments`, `payment_items` or `recurrent_payments`. Currency is one application config, default `EUR` (`crm-application-module/src/Seeders/ConfigsSeeder.php`, line 80). Only `invoice_items.currency` stores a currency string.
+
+`payment_items` (`payment_id`, `type`, `subscription_type_id`, `product_id`, `postal_fee_id`, `name`, `count`, `amount`, `amount_without_vat`, `vat`) carries the line items. Type literals defined in code are `subscription_type` (default), `donation`, `authorization`, `gift`, `product`, `postal_fee`.
+
+`recurrent_payments` (init migration lines 110 to 144) is one row per future charge: `cid` (legacy card token), `payment_method_id`, `chain_id` and `cycle` (added by `20250902124449_add_chain_tracking_columns_to_recurrent_payments.php`), `charge_at`, `expires_at` (the card expiry fetched from the gateway, not a subscription expiry), `payment_id`, `parent_payment_id`, `retries`, `status` and `approval` (gateway results), `user_id` (FK), `subscription_type_id`, `next_subscription_type_id`, `state`, `note`, `custom_amount`. `RecurrentPaymentStateEnum` has exactly seven cases: `user_stop`, `admin_stop`, `active`, `pending`, `charged`, `charge_failed`, `system_stop`. `cycle` starts at 1 and increments per successful renewal; rows that predate the 2025 backfill command have NULL.
+
+Every payment stores `ip` and `user_agent`, overwritten with `GDPR removal` on anonymisation. `payment_meta` carries `rtm_campaign`, `rtm_content`, `rtm_source`, `rtm_medium`, `rtm_variant` (renamed from `utm_*` by `20201209124720_rename_utm_to_rtm_in_payments_meta.php`), `newsletters_subscribe`, gateway transaction references and refund details.
+
+Events: Hermes `new-payment`, `payment-status-change` (with `payment_id`, `sales_funnel_id`, `send_email`), `recurrent-payment-created`, `recurrent-payment-state-changed`, `recurrent-payment-renewed`. On `paid` or `prepaid`, `PaymentStatusChangeHandler` creates the subscription and writes `payments.subscription_id`.
+
+#### Segments and scenarios
+
+A CRM segment is a SQL template stored in `segments.query_string` with the placeholders `%fields%`, `%table%`, `%where%`, `%group_by%` and optional `%segment.<code>%` (`crm-segment-module/src/Models/SegmentQuery.php`, lines 84 to 124). `segments.table_name` is `users`, `subscriptions` or `payments`. `segments.version` 2 rows are built from a JSON criteria tree in `segments.criteria`. There is no table of segment members. `segments_values` stores counts over time, refreshed by `segment:actualize_counts` on a per segment periodicity (default 6 hours). Membership checks run the segment SQL per call.
+
+The endpoints Mailer and Campaign call are in `crm-segment-module/src/SegmentModule.php` (lines 77 to 95): `GET /api/v1/user-segments/list` returns only `users` based segments; `GET /api/v1/user-segments/users?code=` streams `{id, email}` pairs with the id cast to a string from one unpaged SQL run; `GET /api/v1/user-segments/check` accepts `resolver_type` `id` or `email`. The string id on this endpoint is why Beam and Campaign treat `user_id` as a string.
+
+Scenarios are automation graphs (`scenarios`, `scenarios_triggers`, `scenarios_elements`, edges, `scenarios_jobs`, `scenarios_job_history`). Triggers are Hermes messages mapped to public event codes: `user_registered`, `user_confirmed`, `new_subscription`, `subscription_starts`, `subscription_ends`, `subscription_upgraded`, `new_payment`, `payment_change_status`, `recurrent_payment_renewed`, `recurrent_payment_state_changed`, `new_invoice`, `address_changed`, `new_address`, `new_order`, `order_status_change`, plus before events (`subscription_ends`, `before_recurrent_payment_charge`, `before_recurrent_payment_expires`, `after_last_subscription_ended`) and repeating segment triggers. Actions are `email` (through Mailer), `push_notification`, `banner` (emits `BannerEvent`; no listener exists in the clones), `segment`, `condition`, `wait`, `goal`, `generic`, `ab_test`. Scenarios never subscribe to Beam events.
+
+#### Sales funnels and shop
+
+`sales_funnels` (`id`, `url_key` UNIQUE, Twig `body`, validity window, `segment_id`, counters) is the CRM checkout. A submit creates the payment, sets `payments.sales_funnel_id`, and emits a Hermes message of type `sales-funnel` with `type: 'payment'`, `user_id`, `sales_funnel_id`, `payment_id` merged with the output of `TrackerDataProviderInterface` providers (`crm-salesfunnel-module/src/Presenters/SalesFunnelFrontendPresenter.php`, lines 453 to 498). The shop emits the same message with `sales_funnel_id: 'shop'`, and the upgrades module emits it with `transaction_id`, `product_ids` and `revenue`, which are the Beam `CommercePayment` field names. Funnel statistics are counted per day, type (`show`, `form`, `no_access`, `error`, `ok`) and device type in `sales_funnels_stats`.
+
+#### Mailer integration
+
+`crm-remp-mailer-module` has no tables. Its repositories are HTTP wrappers around Mailer's API. The CRM calls Mailer's `users/user-registered`, `users/email-changed`, `users/delete`, `users/subscribe`, `users/un-subscribe`, `users/bulk-subscribe`, `users/is-subscribed`, `users/is-unsubscribed`, `users/user-preferences`, `users/logs`, `users/logs-count-per-status`, `mailers/send-email`, `mailers/mail-types`, `mailers/templates` and `mailers/jobs` (`crm-remp-mailer-module/src/Models/Api/Client.php`, lines 19 to 37). Every call identifies the person by `user_id` (integer) and clear text `email`; `users.uuid` is never sent. Newsletter consent is therefore held only in Mailer, and the CRM caches the subscribed list codes in the Redis user data document under the provider `remp_mailer_subscriptions`.
+
+The CRM endpoints that REMP calls (section 1.6) all exist: `POST /api/v1/users/list` (API token; `user_ids`, `page` of 1000, `include_deactivated`, `with_uuid`; never returns anonymised users), `GET /api/v1/users/touch` (refreshes the Redis user data), `POST /api/v1/users/set-email-validated` v1 and v2 (write `users.email_validated_at`), `POST /api/v1/users/login`, `GET /api/v1/user/info`, `GET /api/v1/token/check`, and the three `user-segments` endpoints.
+
+#### Time zones and audit
+
+Every raw SQL migration sets `time_zone = '+00:00'` for its own session only. All datetime columns are MySQL `datetime` without a zone, and `Repository::processDateFields` converts every value to `date_default_timezone_get()` before writing (`crm-application-module/src/Models/Database/DateFieldsProcessorTrait.php`, lines 7 to 16). The skeleton sets `date.timezone: Europe/Bratislava` (`crm-skeleton/app/config/config.neon`, line 68). Inferred: CRM datetimes are wall clock values in the publisher's PHP zone, and an exporter has to attach that zone. API responses carry an explicit offset.
+
+Every repository write is mirrored into `audit_logs` (`operation`, `user_id` of the acting admin, `table_name`, `signature`, `data` JSON with `from` and `to`), created by `crm-application-module/src/migrations/20180831084242_add_audit_logs.php`.
+
+#### What the CRM does not contain
+
+- No Beam tracker client, no `/track/commerce` call, no Journal client and no `remplib` reference in any cloned module. The only Beam facing hooks are the three `TrackerDataProviderInterface` extension points (`sales_funnel.dataprovider.tracker`, `products.dataprovider.tracker`, `upgrades.dataprovider.tracker`) and the Hermes `sales-funnel` message, for which no handler exists in the clones. Inferred: the bridge to the Beam Tracker is a publisher specific module.
+- No `browser_id`, session id or device id column on any table. `device_tokens.device_id` is a mobile app identifier used for login.
+- No newsletter consent table. Consent like timestamps are `users.confirmed_at`, `users.email_validated_at` (written by Mailer) and the `user_meta` key `gdpr = confirm_payment` set on the payment return page.
+- No currency column on payment rows.
+- No demographic columns (age, gender, education, income).
 
 ## 2. What the churn prediction module needs
 
@@ -471,22 +575,22 @@ The merge script (`churn/src/Models/BigQuery/StagingMergeSqlBuilder.php`, lines 
 
 ### 2.2 Subscription features and the CRM tables they read
 
-The subscription feature rows (the "analytical base table") are built in PHP from CRM MySQL. The CRM application is not in the repository, so the tables below are inferred from the SQL in `RunChurnPipelineCommand.php` and `churn/src/Models/ChurnExport/TierMaxPriceSnapshotBuilder.php`.
+The subscription feature rows (the "analytical base table") are built in PHP from CRM MySQL. The tables below are the ones the SQL in `RunChurnPipelineCommand.php` and `churn/src/Models/ChurnExport/TierMaxPriceSnapshotBuilder.php` reads. Their definitions were checked against the CRM module repositories (section 1.8).
 
-| CRM table (inferred) | Columns used | Where |
+| CRM table | Columns used | Where in the churn module |
 |---|---|---|
 | `subscriptions` | `id`, `user_id`, `subscription_type_id`, `is_paid`, `is_recurrent`, `length`, `start_time`, `end_time`, `created_at` | lines 509 to 538, 648 to 655, 806 to 828 |
 | `users` | `id`, `created_at`, `source`, `registration_channel` | lines 660, 669 to 671 |
 | `subscription_types` | `id`, `length`, `price`, `created_at` | line 686; `TierMaxPriceSnapshotBuilder.php` lines 90 to 96 |
 | `subscription_type_content_access`, `content_access` | `subscription_type_id`, `content_access_id`; `id`, `name` | lines 561 to 566, 681, 687 to 688 |
 | `subscription_type_tags` | `subscription_type_id`, `tag` (value `trial`) | lines 817, 824 |
-| `subscription_upgrades` | `base_subscription_id`, `created_at` | lines 819 to 823 |
+| `subscription_upgrades` | `base_subscription_id`, `created_at` (the table also has `upgraded_subscription_id` and `type`) | lines 819 to 823 |
 | `payments` | `id`, `user_id`, `subscription_id`, `amount`, `status`, `created_at`, `payment_gateway_id` | lines 677, 689 to 691, 853 to 859, 877 to 886 |
 | `payment_gateways` | `id`, `code` | lines 678, 692 |
-| `payment_items` | `payment_id`, `type` (`donation` or `product`), `amount` | lines 879 to 883 |
+| `payment_items` | `payment_id`, `type` (`donation` or `product`; the CRM also defines `subscription_type`, `authorization`, `gift`, `postal_fee`), `amount` | lines 879 to 883 |
 | `recurrent_payments` | `user_id`, `created_at`, `updated_at`, `expires_at`, `charge_at`, `state`, `cycle` | lines 907 to 913, 933 to 938 |
 
-Payment status literals used are `paid`, `prepaid`, `authorized`, `family`, `upgrade` and `fail`. Recurrent payment states used are `user_stop` (a literal at line 911) and, through the CRM enum `RecurrentPaymentStateEnum` (`ChurnFeatureCalculator.php`, lines 187 to 191), `UserStop`, `AdminStop` and `SystemStop`. The string values `admin_stop` and `system_stop` are inferred from the comment at line 143.
+Payment status literals used are `paid`, `prepaid`, `authorized`, `family`, `upgrade` and `fail`. The CRM's `PaymentStatusEnum` defines `form`, `paid`, `fail`, `timeout`, `refund`, `imported`, `prepaid` and `authorized` (`crm-payments-module/src/Models/Payment/PaymentStatusEnum.php`, lines 11 to 18); `family` and `upgrade` are not among them and do not appear in any cloned module. Inferred: they come from a module that was not cloned or from a specific installation. Recurrent payment states used are `user_stop` (a literal at line 911) and, through the CRM enum `RecurrentPaymentStateEnum` (`ChurnFeatureCalculator.php`, lines 187 to 191), `UserStop`, `AdminStop` and `SystemStop`. The string values `admin_stop` and `system_stop` are confirmed by the CRM enum (`crm-payments-module/src/Models/RecurrentPayment/RecurrentPaymentStateEnum.php`, lines 11 to 17). Two CRM facts matter for these features: `recurrent_payments.expires_at` is the card expiry fetched from the gateway, and `cycle` exists only since 2025 and is NULL on older rows unless the backfill command was run.
 
 Columns written per row, in order (`RunChurnPipelineCommand.php`, lines 659 to 682 and 742 to 755):
 
@@ -595,7 +699,7 @@ Options that change what the pipeline runs on (`RunChurnPipelineCommand.php`):
 
 ### 2.6 Identity assumptions
 
-The CRM `users.id` and `subscriptions.id` are integers. The evidence inside the module is the docblock on `computeFeatures` (`churn/src/DataProviders/ChurnFeatureDataProviderInterface.php`, line 31: `user_id: int, subscription_id: int`), the `INT64` columns of the BigQuery tables, and the foreign keys in the `churn_predictions` migration.
+The CRM `users.id` and `subscriptions.id` are `int(11) AUTO_INCREMENT` columns (`crm-users-module/src/migrations/20180831074542_users_module_init_migration.php`, line 16; `crm-subscriptions-module/src/migrations/20180831074642_subscriptions_module_init_migration.php`, line 92). The evidence inside the module is the docblock on `computeFeatures` (`churn/src/DataProviders/ChurnFeatureDataProviderInterface.php`, line 31: `user_id: int, subscription_id: int`), the `INT64` columns of the BigQuery tables, and the foreign keys in the `churn_predictions` migration.
 
 The module joins Beam to the CRM with `pv.user_id = CAST(obs.user_id AS STRING)`. Inferred: it assumes the publisher's front end sends the CRM `users.id` as Beam's `user_id`. `browser_id` is never read. Pageviews without a `user_id` contribute nothing. There is no identity stitching anywhere in the module. The join keys are `(user_id, DATE(observed_at))` for engagement, `(subscription_id, days_to_expiry)` for subscription features, `(prediction_date, subscription_id)` for predictions and `subscription_id` for the CRM table.
 
@@ -741,19 +845,19 @@ The mappings below name the REMP source and the ADC target. Where a transformati
 | ADC property | REMP source | Notes |
 |---|---|---|
 | `userID` | CRM `users.id` (inferred), as carried in Mailer `mail_user_subscriptions.user_id` (integer) and Beam `user_id` (string) | Inferred: to be global, the id needs a publisher namespace, for example `<dataSource>:<id>`; ADC does not say how to form one. Anonymous Beam `browser_id` has no home here, see 4.4. |
-| `givenName`, `familyName` | not in REMP | Mailer forwards whatever `IUser::list()` returns into `mail_job_queue.params`, but the shipped `IUser` interface declares no field names and the two shipped providers (`Dummy`, `Crm`) return only `id` and `email`. |
-| `primaryEmail` | Mailer `mail_user_subscriptions.user_email`, `mail_logs.email` | Clear text in REMP. ADC has no hashing rule. |
-| `additionalEmails` | `POST /api/v1/users/email-changed` carries `original_email` and `new_email` but Mailer does not keep the old one | No source. |
+| `givenName`, `familyName` | CRM `users.first_name`, `users.last_name` (also `public_name`, and names on `addresses`) | Not in Beam, Mailer or Campaign. Mailer's `IUser` providers return only `id` and `email`. |
+| `primaryEmail` | CRM `users.email` (UNIQUE); Mailer `mail_user_subscriptions.user_email`, `mail_logs.email` | Clear text in REMP. ADC has no hashing rule. |
+| `additionalEmails` | CRM `user_connected_accounts.email` (Google or Apple sign in) | Mailer's `email-changed` call carries the old address but neither system keeps it. |
 | `engagementScore` | none directly. Candidates: Beam `views_per_user_mv.total_views_last_30_days`, author or section segment membership, `churn_engagement_features` columns | ADC requires 1 to 5 with no definition. Any mapping is a publisher convention. Inferred: `churn_probability` is a different quantity (a 0 to 1 probability, not a 1 to 5 score), so mapping it here would change its meaning. |
 | `tags` | Mailer `mail_types.code` of lists where `subscribed = 1`; Beam `segments.code` for segments the user is in (`GET /segments/{segment_code}/users`, `beam-go/cmd/segments/design/resources.go`, line 151) | ADC's description names "MailChimp lists", which matches Mailer lists. Segment membership would need a prefix to avoid collision. |
 | `dataSource` | Beam `token` (property uuid), or a per publisher constant | Required. |
-| `consentDate` | Mailer `mail_user_subscriptions.created_at` or `updated_at` of a subscribed row | Mailer has one row per list; ADC has one date per person. A reducer (earliest or latest) is a convention. |
+| `consentDate` | Mailer `mail_user_subscriptions.created_at` or `updated_at` of a subscribed row; CRM `users.confirmed_at` (account confirmation) or `users.email_validated_at` (deliverability, written by Mailer) | Mailer has one row per list; ADC has one date per person. A reducer (earliest or latest) is a convention. The two CRM timestamps are not newsletter consent. |
 | `consentType` | `mail_types.auto_subscribe` on registration maps to `implicit`; a row created through `users/subscribe` maps to `explicit`; rows created by `mail:sync-user-subscriptions` map to `imported` | Inferred mapping. Mailer does not record how a row was created, so this can only be derived at write time, not from the stored row. |
-| `demographics.*` | not in REMP | No source. |
+| `demographics.*` | not in REMP (no age, gender, education or income column in any CRM table) | No source. |
 | `location.addressCountry` | Campaign resolves country from the request IP at showtime with MaxMind but never stores it. Beam stores `ip` only when a server side caller sends `user.ip_address` (`track.go`, line 363); the browser library does not send it | Could be derived per event for server side callers only, not per person. |
-| `location.postalCode`, `.addressLocality` | not in REMP | No source. |
-| `behavior.donorStatus` | churn module `donation_amount_total` from CRM `payment_items.type = 'donation'` (inferred table) | The $100 threshold is prose; currency is undefined. `lapsed` has no definition. |
-| `behavior.lastDonationDate` | CRM `payments.created_at` of the latest donation item (inferred) | |
+| `location.postalCode`, `.addressLocality`, `.addressCountry` | CRM `addresses.zip`, `addresses.city`, `addresses.country_id` to `countries.iso_code`, per address type (`invoice`, `print`, `shop`, ...) with `is_default` | A person can have several addresses; the mapping has to pick one. |
+| `behavior.donorStatus` | CRM `payment_items.type = 'donation'` sums (the churn module's `donation_amount_total`), `subscriptions.type = 'donation'`, and the `users.supporter` flag | The $100 threshold is prose; the CRM has no currency column, only a global `currency` config. `lapsed` has no definition. |
+| `behavior.lastDonationDate` | CRM `payments.paid_at` of the latest payment with a `donation` item | |
 | `interests.topics` | Beam `article_aggregated_views` joined to `article_tag` and `article_section`, or the churn `top_tag_share` input | Derived, not stored. |
 | `interests.commentedOn` | not in REMP | No source. |
 
@@ -871,12 +975,12 @@ A `web_read` action built from Beam collapses three Elasticsearch documents (loa
 | ADC concept | REMP status |
 |---|---|
 | Global person id across sources | None. No component validates the CRM id against the CRM (see 1.7). Beam and Campaign carry it as a string while Mailer stores it as an integer. |
-| Names (`givenName`, `familyName`) | Not stored in any REMP table. |
-| Demographics (age group, gender, education, income) | Not stored. |
-| Location on the person | Not stored. Campaign resolves country per request and discards it. |
-| Donor status and last donation date | Not in REMP. The churn module derives donation totals from inferred CRM `payment_items`. |
+| Names (`givenName`, `familyName`) | Stored only in the CRM (`users.first_name`, `users.last_name`, `addresses`). Beam, Mailer and Campaign hold none. |
+| Demographics (age group, gender, education, income) | Not stored anywhere, including the CRM. |
+| Location on the person | Stored only in the CRM `addresses` table (several per user, typed). Campaign resolves country per request and discards it. |
+| Donor status and last donation date | Not as a status. The CRM has `users.supporter`, `subscriptions.type = 'donation'` and `payment_items.type = 'donation'`, from which the churn module derives donation totals. |
 | Interests and commented topics | Not stored. Derivable from `article_aggregated_views` plus tags and sections for 30 days. |
-| Consent type and consent date as a person attribute | Mailer has per list rows with timestamps but no record of how consent was obtained. |
+| Consent type and consent date as a person attribute | Mailer has per list rows with timestamps but no record of how consent was obtained. The CRM has `confirmed_at` and `email_validated_at`, which are account and deliverability facts, not consent. |
 | Surveys, survey responses, forms, comments, in person events | No tables or events. |
 | App reads | The Tracker payload has no app or platform attribute. The Tracker derives `derived_ua_device`, `derived_ua_os` and `derived_ua_platform` from the user agent (`track.go`, lines 375 to 378), which distinguish device class and OS, not a native app. |
 | A controlled action vocabulary | Beam `events` accept any `category` and `action` string. |
@@ -903,7 +1007,7 @@ A `web_read` action built from Beam collapses three Elasticsearch documents (loa
 3. ADC has no event identity or envelope. Without an action id, a sequence or an ingestion time, deduplication and late arrival handling are not possible at the schema level. REMP already has `remp_pageview_id`, `remp_event_id`, `remp_commerce_id` and `transaction_id` for exactly this.
 4. ADC consent is a single person level pair. Mailer consent is per list, per variant, with the flag history overwritten on each flip and rtm attribution of the last change. Reducing that to one `consentType` and `consentDate` loses the per list state that drives sending.
 5. The validator does not validate data. A record with a wrong taxonomy value, a malformed date or a missing required property passes through unnoticed, because no tool in the repository checks records. An adopter that wants record checks would have to write them; nothing in the repository does.
-6. Identity is clear text email matching. `primaryEmail` and `additionalEmails` are described as the matching mechanism. REMP stores emails in Mailer. Beam can also receive them through `/track/entity`: the Beam seeder defines an entity `user` with params `id` and `email` (`remp-master/Beam/database/seeders/EntitySeeder.php`, lines 18 to 36). Entity documents land in the `entities` index without `token`, `user_id` or `browser_id`, so such emails have no provenance. Nothing in ADC specifies hashing, salting or pseudonymisation. Sharing such records between organisations would need a privacy layer that ADC does not define.
+6. Identity is clear text email matching. `primaryEmail` and `additionalEmails` are described as the matching mechanism. REMP stores emails in the CRM (`users.email`, plus names, addresses, `ip` and `user_agent` on every payment) and in Mailer. Beam can also receive them through `/track/entity`: the Beam seeder defines an entity `user` with params `id` and `email` (`remp-master/Beam/database/seeders/EntitySeeder.php`, lines 18 to 36). Entity documents land in the `entities` index without `token`, `user_id` or `browser_id`, so such emails have no provenance. Nothing in ADC specifies hashing, salting or pseudonymisation. Sharing such records between organisations would need a privacy layer that ADC does not define.
 7. The `objectID` pattern requires a domain shaped string (a dotted host name with a two letter or longer top level domain, with optional scheme, port and path), and it rejects the "hashed uuid" its own description mentions. REMP keys articles by CMS `external_id`, and Beam's `articles.url` is neither unique nor stable. Newsletters and lists have no URL at all. Minting URLs is a convention the adopter must own.
 8. The 1.0.0 `@context` has known IRI collisions (`person` and `object` on `action` both map to `schema:identifier`), so JSON-LD processors cannot distinguish actor from object. The README lists these under "Known issues (to be addressed in 1.1)". Inferred: until then a linked data consumer cannot tell `person` from `object` on an action by IRI alone.
 9. `engagementScore` has no definition and a minimum of 1, so "no engagement" cannot be expressed as 0. Churn probability is a different quantity and should stay out of this field.
@@ -920,6 +1024,8 @@ Inferred, as a design position: ADC works as an export layer for the reading and
 Every tracked call is one Kafka message on `beam_events` (or one Pub/Sub message), except `/track/impressions`, which emits one message per impression block in the payload (`track.go`, lines 300 to 316). The message is an Influx line protocol point with the measurement name and a single `_json` field holding the flat document (`kafka_event_producer.go`, lines 56 to 66). Telegraf, the metrics agent that reads Kafka and writes Elasticsearch, consumes it with the consumer group `beam_consumers`. A consumer group is Kafka's way of letting several readers share a topic while each message goes to one of them. Inferred from Kafka semantics: a second consumer group can read the same topic without touching the Tracker or Telegraf. The measurement name is the only routing key; there is no message key, no partition key and no schema version field.
 
 When Mailer is configured with `Tracker\Remp`, its `mail-type/subscribe`, `mail-type/subscribe-variant` and `mail-type/unsubscribe` events reach the same topic through the Tracker. `mail/sent` needs the `MailSentEventHandler` subscription, which is commented out in the example config. Mailer's delivery events (opens, clicks, bounces) never reach the topic: in webhook mode they become a `mailgun-event` message in Hermes, and in polling mode `mailgun:events` writes straight to `mail_logs`. Campaign's `banner/*` events reach the topic through the browser.
+
+The CRM has its own stream that never reaches Kafka. Every subscription and payment change is emitted as a Hermes message on the CRM's Redis queues: `new-subscription`, `update-subscription`, `subscription-starts`, `subscription-ends`, `new-payment`, `payment-status-change`, `recurrent-payment-created`, `recurrent-payment-state-changed`, `recurrent-payment-renewed`, `user-registered`, `email-changed`, `user-confirmed`, `address-changed`, `new-address` (section 1.8). Scenarios consume them inside the CRM. The only CRM to Beam path is the `sales-funnel` Hermes message shaped like a Beam commerce payload, whose consumer is a publisher module outside the cloned repositories.
 
 ### 6.2 Which REMP events could become ADC actions in real time
 
@@ -997,7 +1103,7 @@ The churn model is batch in four places. Each would need to change.
 |---|---|
 | `beam-bigquery-export` loads yesterday's `pageviews` and `pageviews_time_spent` into BigQuery at 03:05 | A consumer on `beam_events` that writes pageview, timespent and progress messages into BigQuery as they arrive. Because `pageviews_time_spent` is an overwrite in Elasticsearch, the stream version would hold many rows per `remp_pageview_id` and the engagement SQL would need `MAX(timespent)` per pageview instead of `SUM(timespent)` over rows. |
 | `engagement_features.sql` computes 30 and 90 day windows once per day for the `(user_id, observed_date)` pairs exported today, with windows ending at `observed_date - 1 day` | Option A: keep the daily recompute and point the same SQL at streamed rows. Option B: maintain per user rolling aggregates updated per message. B must track distinct pageviews, days, articles, tags and authors over 30 and 90 days, plus timespent. The delta features (`30d vs prev 30d`) and `top_tag_share` need per tag counters. |
-| Subscription features are exported by PHP from CRM MySQL once per day, with `observed_at = now` for scoring | Subscription state changes are not on the topic at all. The CRM (not in this repository) would have to emit subscription, payment and recurrent payment changes as events, or the scoring export stays batch and only the engagement side streams. Inferred: the second option is the realistic first step, since the subscription features change rarely and the CRM already exports them idempotently. |
+| Subscription features are exported by PHP from CRM MySQL once per day, with `observed_at = now` for scoring | Subscription state changes are not on the Kafka topic. The CRM already emits them as Hermes messages on its Redis queues (`new-subscription`, `subscription-starts`, `subscription-ends`, `payment-status-change`, `recurrent-payment-state-changed`, `recurrent-payment-renewed`, section 1.8), so a bridge from Hermes to Kafka would put subscription and payment changes on the stream without changing the CRM. Even then the subscription features need as-of history (tenure, gaps, payment counts), which the CRM holds as rows, not events. Inferred: the realistic first step is to keep the daily subscription export and stream only the engagement side. |
 | `ML.PREDICT` runs once per day over `churn_scoring_all_features`, keyed by `(prediction_date, subscription_id)` | Scoring could run on a schedule shorter than a day over the same view, or per user when an engagement aggregate crosses a threshold. The BigQuery predictions table already supports many rows per subscription. The CRM `churn_predictions` table holds one row per subscription. `churn:download_churn_predictions` picks the newest row, so it would simply see a fresher one. |
 
 Constraints that do not change with streaming:
@@ -1017,5 +1123,6 @@ Constraints that do not change with streaming:
 | Mailer | `mailer-module/migrations/*.php` (86), `mailer-module/Repositories/*.php`, `mailer-module/Hermes/*.php`, `mailer-module/Api/`, `mailer-module/Models/`, `mailer-module/config/*.neon`, `remp-master/Mailer/app/config/*.neon*` |
 | Campaign | `campaign-module/database/migrations/*.php` (69), `campaign-module/database/schema/mysql-schema.sql`, `campaign-module/src/*.php`, `campaign-module/src/Http/Showtime/Showtime.php`, `campaign-module/public/showtime.php`, `campaign-module/resources/assets/js/remplib.js`, `campaign-module/src/Contracts/` |
 | SSO and shared libraries | `remp-master/Sso/database/migrations/*.php` (3), `remp-master/Sso/app/`, `remp-master/Composer/laravel-sso/`, `remp-master/Composer/laravel-helpers/` |
+| CRM (separate repositories) | `crm-skeleton/composer.json`; for each of `crm-users-module`, `crm-api-module`, `crm-admin-module`, `crm-subscriptions-module`, `crm-upgrades-module`, `crm-gifts-module`, `crm-print-module`, `crm-payments-module`, `crm-stripe-module`, `crm-invoices-module`, `crm-segment-module`, `crm-scenarios-module`, `crm-dashboard-module`, `crm-application-module`, `crm-remp-mailer-module`, `crm-onboarding-module`, `crm-issues-module`, `crm-products-module`, `crm-salesfunnel-module`: `src/migrations/*.php`, `src/Repositories/`, `src/Models/`, `src/Api/`, `src/Events/`, `src/Hermes/`, `src/DataProviders/`, `src/*Module.php`, `src/config/config.neon`, `README.md` |
 | Churn module | `churn/README.md`, `churn/src/Commands/RunChurnPipelineCommand.php`, `churn/src/Commands/DownloadChurnPredictionsCommand.php`, `churn/src/Commands/bigquery/engagement_features.sql`, `churn/src/Commands/bigquery/churn_predict.sql`, `churn/src/Models/ChurnExport/*.php`, `churn/src/Models/BigQuery/StagingMergeSqlBuilder.php`, `churn/src/migrations/20260723205508_add_churn_predictions_table.php`, `churn/src/Tests/` |
 | ADC | `adc/schema/adc.schema.jsonld`, `adc/taxonomies/*.json`, `adc/scripts/validate.mjs`, `adc/scripts/validate.test.mjs`, `adc/README.md`, `adc/CHANGELOG.md`, `adc/CONTRIBUTING.md`, `adc/.github/workflows/*.yml` |
